@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Flowchart label escaping** - Quote node, edge, and subgraph labels that contain flowchart delimiter characters so rendered output remains parseable.
+
 ## [0.8.2] - 2025-01-18
 
 ### Added

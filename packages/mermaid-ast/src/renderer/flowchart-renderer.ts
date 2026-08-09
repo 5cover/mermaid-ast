@@ -8,6 +8,7 @@ import type {
   FlowchartAST,
   FlowchartLink,
   FlowchartNode,
+  FlowchartText,
   FlowchartSubgraph,
 } from '../types/flowchart.js';
 import type { RenderOptions, ResolvedRenderOptions } from '../types/render-options.js';
@@ -16,55 +17,80 @@ import { assertNever } from '../utils.js';
 import { block, type Doc, indent, render, when } from './doc.js';
 
 /**
- * Escape special characters in text
+ * Characters that terminate or redirect Mermaid flowchart text lexing.
  */
-function escapeText(text: string): string {
-  return text.replace(/"/g, '\\"');
+const FLOWCHART_TEXT_DELIMITER = /[()[\]{}|]/;
+
+/**
+ * Render text for Mermaid's flowchart `text` grammar production.
+ *
+ * The unquoted lexer state treats brackets, braces, parentheses, and pipes as
+ * syntax. Use Mermaid string labels for those cases so labels like `(` render
+ * as `["("]` instead of invalid syntax such as `[(]`.
+ *
+ * Mermaid flowchart strings do not support backslash-escaped double quotes. A
+ * literal `"` must currently be represented with an entity such as `&quot;`,
+ * but entity encoding changes parse/render AST semantics and should be an
+ * explicit policy rather than a hidden renderer side effect.
+ */
+function renderText(text: FlowchartText | undefined, fallback: string): string {
+  const value = text?.text ?? fallback;
+
+  if (value.includes('"')) {
+    throw new Error(
+      'Flowchart text contains a double quote. Mermaid flowchart syntax cannot represent this directly; use an entity such as &quot; explicitly.'
+    );
+  }
+
+  if (FLOWCHART_TEXT_DELIMITER.test(value)) {
+    return `"${value}"`;
+  }
+
+  return value;
 }
 
 /**
  * Render node shape syntax
  */
 function renderNodeShape(node: FlowchartNode): string {
-  const text = node.text?.text || node.id;
-  const escapedText = escapeText(text);
+  const text = renderText(node.text, node.id);
 
   switch (node.shape) {
     case 'square':
-      return `[${escapedText}]`;
+      return `[${text}]`;
     case 'round':
-      return `(${escapedText})`;
+      return `(${text})`;
     case 'circle':
-      return `((${escapedText}))`;
+      return `((${text}))`;
     case 'doublecircle':
-      return `(((${escapedText})))`;
+      return `(((${text})))`;
     case 'ellipse':
-      return `(-${escapedText}-)`;
+      return `(-${text}-)`;
     case 'stadium':
-      return `([${escapedText}])`;
+      return `([${text}])`;
     case 'subroutine':
-      return `[[${escapedText}]]`;
+      return `[[${text}]]`;
     case 'cylinder':
-      return `[(${escapedText})]`;
+      return `[(${text})]`;
     case 'diamond':
-      return `{${escapedText}}`;
+      return `{${text}}`;
     case 'hexagon':
-      return `{{${escapedText}}}`;
+      return `{{${text}}}`;
     case 'odd':
-      return `>${escapedText}]`;
+      return `>${text}]`;
     case 'trapezoid':
-      return `[/${escapedText}\\]`;
+      return `[/${text}\\]`;
     case 'inv_trapezoid':
-      return `[\\${escapedText}/]`;
+      return `[\\${text}/]`;
     case 'lean_right':
-      return `[/${escapedText}/]`;
+      return `[/${text}/]`;
     case 'lean_left':
-      return `[\\${escapedText}\\]`;
+      return `[\\${text}\\]`;
     default:
       if (!node.text) {
         return '';
       }
-      return `[${escapedText}]`;
+      return `[${text}]`;
   }
 }
 
@@ -139,7 +165,7 @@ function renderLink(link: FlowchartLink): string {
   const arrow = renderLinkArrow(link);
 
   if (link.text?.text) {
-    return `${arrow}|${escapeText(link.text.text)}|`;
+    return `${arrow}|${renderText(link.text, '')}|`;
   }
 
   return arrow;
@@ -231,7 +257,7 @@ function renderSubgraph(
   const title = subgraph.title?.text || subgraph.id;
   const header =
     title !== subgraph.id
-      ? `subgraph ${subgraph.id}[${escapeText(title)}]`
+      ? `subgraph ${subgraph.id}[${renderText(subgraph.title, subgraph.id)}]`
       : `subgraph ${subgraph.id}`;
 
   // Get nodes to render (optionally sorted)
@@ -326,7 +352,7 @@ function buildLinkChains(
     // Follow the chain
     while (true) {
       const edges = outgoing.get(current);
-      if (!edges || edges.length !== 1) break;
+      if (edges?.length !== 1) break;
 
       const edge = edges[0];
       if (visited.has(edge.index)) break;
