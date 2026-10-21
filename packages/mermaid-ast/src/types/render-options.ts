@@ -59,8 +59,9 @@ export type WhitespaceMode = 'pretty' | 'compact';
  * Link compression for flowcharts.
  * - `true`: chain consecutive links (same as `{ chains: true }`)
  * - `{ chains }`: join consecutive links into chains (A --> B --> C)
- * - `{ cross }`: join links that share endpoints into `&` groups (A & B --> C & D).
- *   Not implemented yet; the flag is accepted and has no effect.
+ * - `{ cross }`: join links that share a connector into `&` groups (A & B --> C & D)
+ * - `{ chains, cross }`: chain the `&` groups at shared groups (A & B --> C --> D & E),
+ *   and emit whichever of chains only, cross only, or this joint plan is shortest
  *
  * Enabled options may reorder edges and change layout. Edge labels, ids and
  * styles are preserved.

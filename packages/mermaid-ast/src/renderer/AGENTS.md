@@ -81,7 +81,7 @@ All renderers accept optional `RenderOptions` (from `src/types/render-options.ts
 - `sortNodes`, `inlineClasses` — flowchart and others, see the README
 - `compactLinks` — flowchart only; see `FlowchartRenderOptions` (`FlowchartLinkCompression`)
 
-Use `resolveOptions()` to apply defaults. Flowchart link planning lives in `flowchart-renderer.ts` (chains: `buildLinkChains`, a minimum trail cover) and `flowchart-cross.ts` (`&` groups).
+Use `resolveOptions()` to apply defaults. Flowchart link planning lives in `flowchart-renderer.ts` and `flowchart-cross.ts` (`&` groups). `candidatePlans` builds the plans for the flags (chains: singleton steps through `chainSteps`; cross: `planCrossStatements`; joint: cross steps through `chainSteps`), `renderLinkPlan` measures each at the real indentation and emits the shortest. `chainSteps` and `coverTrails` are the minimum trail cover over arcs whose endpoints are node or group keys.
 
 ## Adding a new renderer
 
