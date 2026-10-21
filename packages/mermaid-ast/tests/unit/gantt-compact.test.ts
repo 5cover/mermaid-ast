@@ -4,8 +4,9 @@
  * Compact output must parse to the same AST as pretty output, and the official
  * mermaid package must accept the compact text wherever it accepts the pretty text.
  *
- * Tasks parsed from text keep their raw data (rawData), so compact output reuses it
- * verbatim. Tasks built through the API have no rawData and get the compact task form.
+ * Tasks parsed from text keep their raw data (rawData). Compact output rebuilds it in the
+ * compact task form only when the fields read back as the same tokens in the same order;
+ * otherwise it keeps the raw text. Tasks built through the API have no rawData.
  */
 
 import { describe, expect, it } from 'bun:test';
@@ -39,10 +40,6 @@ async function officialParse(text: string): Promise<void> {
   await mermaid.mermaidAPI.getDiagramFromText(text);
 }
 
-function serialize(value: unknown): string {
-  return JSON.stringify(value, (_key, v) => (v instanceof Map ? [...v.entries()] : v));
-}
-
 /** Serialize an AST without rawData, which is the verbatim source text of a task */
 function serializeWithoutRaw(value: unknown): string {
   return JSON.stringify(value, (key, v) => {
@@ -63,6 +60,13 @@ const REPRESENTATIVE = [
   `gantt
     dateFormat YYYY-MM-DD
     Plain task: 2024-01-01, 5d`,
+  `gantt
+    section Build
+    Design   :  done , des1 ,  2024-01-01 ,  2024-01-10`,
+  `gantt
+    Code :done, crit, cod1, 5d`,
+  `gantt
+    Code :cod1, after des1 tst1, 5d`,
 ];
 
 describe('Gantt compact whitespace', () => {
@@ -88,10 +92,36 @@ describe('Gantt compact whitespace', () => {
       expect(text).toBe('gantt\n    title Plan: v2\n    Launch:milestone,2024-02-01,0d');
     });
 
-    it('keeps the raw data of parsed tasks as written', () => {
+    it('compacts parsed task data whose tokens read back unchanged', () => {
       const text = `gantt
     Draft: active, a1, 2024-01-01, 3d`;
-      expect(render(parse(text), { whitespace: 'compact' })).toBe(text);
+      expect(render(parse(text), { whitespace: 'compact' })).toBe(
+        'gantt\n    Draft:active,a1,2024-01-01,3d'
+      );
+    });
+
+    it('keeps the raw text of parsed tasks whose tokens would change', () => {
+      // A second status overwrites the first when fields are read, so the raw text stays
+      const repeated = `gantt
+    Code :done, crit, cod1, 5d`;
+      expect(render(parse(repeated), { whitespace: 'compact' })).toBe(
+        'gantt\n    Code:done, crit, cod1, 5d'
+      );
+
+      // Fields are rebuilt in status, id, start, end order, so a reordered task keeps its text
+      const reordered = `gantt
+    Code :cod1, done, 5d`;
+      expect(render(parse(reordered), { whitespace: 'compact' })).toBe(
+        'gantt\n    Code:cod1, done, 5d'
+      );
+    });
+
+    it('keeps extra tokens of parsed tasks as written', () => {
+      const text = `gantt
+    Code :cod1, 2024-01-01, 5d, extra`;
+      expect(render(parse(text), { whitespace: 'compact' })).toBe(
+        'gantt\n    Code:cod1, 2024-01-01, 5d, extra'
+      );
     });
   });
 
@@ -131,7 +161,7 @@ describe('Gantt compact whitespace', () => {
         const ast = parse(text);
         const reparsedPretty = parse(render(ast));
         const reparsedCompact = parse(render(ast, { whitespace: 'compact' }));
-        expect(serialize(reparsedCompact)).toBe(serialize(reparsedPretty));
+        expect(serializeWithoutRaw(reparsedCompact)).toBe(serializeWithoutRaw(reparsedPretty));
       });
     }
   });

@@ -5,7 +5,7 @@
  */
 
 import type { GanttAST, GanttTask } from '../types/gantt.js';
-import type { RenderOptions } from '../types/render-options.js';
+import type { RenderOptions, WhitespaceMode } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
 import { type Doc, indent, type LinePart, line, render, softSpace, space } from './doc.js';
 
@@ -18,38 +18,44 @@ export interface GanttRenderOptions {
 }
 
 /**
+ * Task fields in the order the renderer writes them
+ */
+function taskFields(task: GanttTask): string[] {
+  return [task.status, task.id, task.start, task.end].filter((field): field is string =>
+    Boolean(field)
+  );
+}
+
+/**
+ * Comma-separated tokens of raw task data, as parseTaskData reads them
+ */
+function rawTokens(rawData: string): string[] {
+  const data = rawData.startsWith(':') ? rawData.slice(1) : rawData;
+  return data.split(',').map((token) => token.trim());
+}
+
+/**
  * Render a task to Mermaid syntax
  */
-function renderTask(task: GanttTask): Doc {
-  // If we have raw data, use it for better round-trip fidelity
+function renderTask(task: GanttTask, whitespace: WhitespaceMode): Doc {
+  const fields = taskFields(task);
+
+  // Raw text is kept for round-trip fidelity. Compact output may rebuild it from the fields
+  // only when they read back as the same tokens in the same order, so nothing is lost
   if (task.rawData) {
-    return line(task.name, task.rawData);
+    const tokens = rawTokens(task.rawData);
+    const sameTokens =
+      tokens.length === fields.length && tokens.every((token, i) => token === fields[i]);
+    if (whitespace === 'pretty' || !sameTokens) {
+      return line(task.name, task.rawData);
+    }
   }
 
-  // Otherwise, reconstruct from parsed data
-  const parts: string[] = [];
-
-  if (task.status) {
-    parts.push(task.status);
-  }
-
-  if (task.id) {
-    parts.push(task.id);
-  }
-
-  if (task.start) {
-    parts.push(task.start);
-  }
-
-  if (task.end) {
-    parts.push(task.end);
-  }
-
-  if (parts.length === 0) {
+  if (fields.length === 0) {
     return line(task.name);
   }
 
-  const data: LinePart[] = parts.flatMap((part, i) => (i === 0 ? [part] : [',', softSpace, part]));
+  const data: LinePart[] = fields.flatMap((part, i) => (i === 0 ? [part] : [',', softSpace, part]));
   return line(task.name, ':', softSpace, ...data);
 }
 
@@ -114,7 +120,7 @@ export function renderGantt(ast: GanttAST, options?: RenderOptions): string {
 
   // Tasks without section
   for (const task of ast.tasks) {
-    body.push(renderTask(task));
+    body.push(renderTask(task, opts.whitespace));
   }
 
   // Sections with tasks
@@ -122,7 +128,7 @@ export function renderGantt(ast: GanttAST, options?: RenderOptions): string {
     // An empty name keeps its trailing space here: line() would drop it and "section" alone does not parse
     body.push(section.name ? line('section', space, section.name) : 'section ');
     for (const task of section.tasks) {
-      body.push(renderTask(task));
+      body.push(renderTask(task, opts.whitespace));
     }
   }
 

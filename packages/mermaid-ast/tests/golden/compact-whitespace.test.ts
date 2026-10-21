@@ -20,9 +20,13 @@ const GOLDEN_DIR = join(import.meta.dir);
 // Diagram types that require async parsing (Langium-based parsers)
 const ASYNC_DIAGRAM_TYPES = new Set(['pie', 'gitgraph']);
 
-// Stable comparison of ASTs that contain Maps
+// Stable comparison of ASTs that contain Maps. rawData (Gantt task source text) is left out:
+// compact output may rewrite it when its fields read back unchanged
 function serialize(value: unknown): string {
-  return JSON.stringify(value, (_key, v) => (v instanceof Map ? [...v.entries()] : v));
+  return JSON.stringify(value, (key, v) => {
+    if (key === 'rawData') return undefined;
+    return v instanceof Map ? [...v.entries()] : v;
+  });
 }
 
 const diagramTypes = readdirSync(GOLDEN_DIR, { withFileTypes: true })

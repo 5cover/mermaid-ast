@@ -656,7 +656,7 @@ flowchart LR
 
 ### Planned
 
-- **Gantt task data in compact output.** Tasks parsed from text keep their original text, so `whitespace: "compact"` does not shorten their data. Only tasks built through the API are compacted. Normalizing that text would change the payload, so it needs a decision first.
+- **Gantt task data that cannot be rebuilt.** Parsed tasks are compacted only when their fields read back as the same tokens in the same order. Tasks with extra tokens, repeated statuses, or fields out of order keep their original text in compact output, so `whitespace: "compact"` does not shorten them. Rebuilding those would need a rule for what each token means.
 
 ### Deferred
 
