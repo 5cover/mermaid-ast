@@ -652,6 +652,27 @@ flowchart LR
     A --> B
 ```
 
+## Roadmap
+
+### Planned
+
+- **Gantt task data in compact output.** Tasks parsed from text keep their original text, so `whitespace: "compact"` does not shorten their data. Only tasks built through the API are compacted. Normalizing that text would change the payload, so it needs a decision first.
+
+### Deferred
+
+These are known gaps. They are not planned for the current release.
+
+- **Edge animation and property statements** (such as `e1@{ animate: true }`) are accepted by Mermaid but not modeled, so they are dropped.
+- **Node `style` statements** are not modeled and are dropped.
+- **Tooltips** are not modeled.
+- **Nested subgraphs** are rendered flat.
+- **Node id `end`** cannot be rendered, because Mermaid rejects it too.
+- **`click` without `href` or a callback** is dropped.
+- **Parser versions.** Vendored grammars stay at Mermaid 11.12.2. Sequence, ER, state and class grammars are 30 to 93 lines behind 12.2.0. The `mermaid` devDependency stays at 11.17.2, so compatibility checks reflect 11.17.2, not 12.x. Newer syntax in those four diagrams is not addressed. Compact-whitespace checks for them cover only syntax that both parsers accept.
+- **Identifier compression** does not rename class names or edge ids.
+- **Scope-aware definition placement and inlining** are not done. Node definitions are not moved across subgraph boundaries to shorten output.
+- **Quote omission** outside flowcharts is deferred. Quotes are kept wherever a grammar may need them.
+
 ## Supported Class Diagram Features
 
 - **Classes**: With labels, members (attributes and methods)
