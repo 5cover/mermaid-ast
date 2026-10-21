@@ -367,10 +367,10 @@ function buildLinkChains(
 } {
   const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
 
-  const trails = weaklyConnectedComponents(ast, pending).flatMap((component) =>
-    planTrails(ast, component)
+  const arcs = pending.map((i) => ({ from: ast.links[i].source, to: ast.links[i].target }));
+  const trails = coverTrails(arcs, (node) => node.length).map((trail) =>
+    trail.map((k) => pending[k])
   );
-  trails.sort((a, b) => Math.min(...a) - Math.min(...b));
 
   const chains = trails.map((trail) => ({
     nodeIds: [ast.links[trail[0]].source, ...trail.map((i) => ast.links[i].target)],
@@ -384,29 +384,36 @@ function buildLinkChains(
 }
 
 /**
- * Group link indices into weakly connected components, each sorted ascending
+ * An arc between two node keys. Trail planning only needs the endpoints.
  */
-function weaklyConnectedComponents(ast: FlowchartAST, indices: number[]): number[][] {
+interface Arc {
+  from: string;
+  to: string;
+}
+
+/**
+ * Group arc indices into weakly connected components, each sorted ascending
+ */
+function weaklyConnectedArcs(arcs: Arc[]): number[][] {
   const incident = new Map<string, number[]>();
-  for (const i of indices) {
-    const { source, target } = ast.links[i];
-    for (const node of [source, target]) {
+  arcs.forEach((arc, i) => {
+    for (const node of [arc.from, arc.to]) {
       incident.set(node, [...(incident.get(node) ?? []), i]);
     }
-  }
+  });
 
   const seen = new Set<number>();
   const components: number[][] = [];
-  for (const start of indices) {
-    if (seen.has(start)) continue;
+  arcs.forEach((_, start) => {
+    if (seen.has(start)) return;
     seen.add(start);
     const component: number[] = [];
     const stack = [start];
     while (stack.length > 0) {
       const i = stack.pop() as number;
       component.push(i);
-      const { source, target } = ast.links[i];
-      for (const node of [source, target]) {
+      const arc = arcs[i];
+      for (const node of [arc.from, arc.to]) {
         for (const j of incident.get(node) ?? []) {
           if (!seen.has(j)) {
             seen.add(j);
@@ -416,35 +423,31 @@ function weaklyConnectedComponents(ast: FlowchartAST, indices: number[]): number
       }
     }
     components.push(component.sort((a, b) => a - b));
-  }
+  });
   return components;
 }
 
 interface TrailEdge {
   from: string;
   to: string;
-  // Link index, or undefined for a virtual edge added to balance the graph
-  link: number | undefined;
+  // Arc index, or undefined for a virtual edge added to balance the graph
+  arc: number | undefined;
 }
 
 /**
- * Cover one connected component with the fewest chains, each starting at the
- * shortest possible id. Returns trails as link indices in chain order.
+ * Cover one connected component with the fewest trails, each starting at the
+ * lightest possible node. Returns trails as arc indices in trail order.
  */
-function planTrails(ast: FlowchartAST, indices: number[]): number[][] {
-  // Net outgoing minus incoming links per node, in first-appearance order
+function planTrails(arcs: Arc[], indices: number[], weight: (node: string) => number): number[][] {
+  // Net outgoing minus incoming arcs per node, in first-appearance order
   const balance = new Map<string, number>();
   for (const i of indices) {
-    const { source, target } = ast.links[i];
-    balance.set(source, (balance.get(source) ?? 0) + 1);
-    balance.set(target, (balance.get(target) ?? 0) - 1);
+    const { from, to } = arcs[i];
+    balance.set(from, (balance.get(from) ?? 0) + 1);
+    balance.set(to, (balance.get(to) ?? 0) - 1);
   }
 
-  const edges: TrailEdge[] = indices.map((i) => ({
-    from: ast.links[i].source,
-    to: ast.links[i].target,
-    link: i,
-  }));
+  const edges: TrailEdge[] = indices.map((i) => ({ from: arcs[i].from, to: arcs[i].to, arc: i }));
 
   const chainStarts: string[] = [];
   const chainEnds: string[] = [];
@@ -453,32 +456,42 @@ function planTrails(ast: FlowchartAST, indices: number[]): number[][] {
     for (let k = 0; k < -net; k++) chainEnds.push(node);
   }
   chainEnds.forEach((end, k) => {
-    edges.push({ from: end, to: chainStarts[k], link: undefined });
+    edges.push({ from: end, to: chainStarts[k], arc: undefined });
   });
 
   if (chainStarts.length === 0) {
     let start = [...balance.keys()][0];
     for (const node of balance.keys()) {
-      if (node.length < start.length) start = node;
+      if (weight(node) < weight(start)) start = node;
     }
-    return [eulerCircuit(edges, start).map((edge) => edge.link as number)];
+    return [eulerCircuit(edges, start).map((edge) => edge.arc as number)];
   }
 
   const circuit = eulerCircuit(edges, edges[0].from);
-  const firstVirtual = circuit.findIndex((edge) => edge.link === undefined);
+  const firstVirtual = circuit.findIndex((edge) => edge.arc === undefined);
   const rotated = [...circuit.slice(firstVirtual + 1), ...circuit.slice(0, firstVirtual + 1)];
 
   const trails: number[][] = [];
   let current: number[] = [];
   for (const edge of rotated) {
-    if (edge.link === undefined) {
+    if (edge.arc === undefined) {
       if (current.length > 0) trails.push(current);
       current = [];
     } else {
-      current.push(edge.link);
+      current.push(edge.arc);
     }
   }
   return trails;
+}
+
+/**
+ * Cover arcs with the fewest trails, ordered by their lowest arc index.
+ * `weight` gives the cost of starting a trail at a node.
+ */
+function coverTrails(arcs: Arc[], weight: (node: string) => number): number[][] {
+  return weaklyConnectedArcs(arcs)
+    .flatMap((component) => planTrails(arcs, component, weight))
+    .sort((a, b) => Math.min(...a) - Math.min(...b));
 }
 
 /**
