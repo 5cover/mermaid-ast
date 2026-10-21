@@ -7,6 +7,7 @@
 import type { JourneyAST, JourneyTask } from '../types/journey.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
+import { type Doc, indent, type LinePart, line, render, softSpace, space } from './doc.js';
 
 /**
  * Render options for journey diagrams
@@ -19,12 +20,13 @@ export interface JourneyRenderOptions {
 /**
  * Render a task to Mermaid syntax
  */
-function renderTask(task: JourneyTask): string {
-  let line = `${task.name}: ${task.score}`;
+function renderTask(task: JourneyTask): Doc {
+  const parts: LinePart[] = [task.name, ':', softSpace, `${task.score}`];
   if (task.actors.length > 0) {
-    line += `: ${task.actors.join(', ')}`;
+    const actors = task.actors.flatMap((actor, i) => (i === 0 ? [actor] : [',', softSpace, actor]));
+    parts.push(':', softSpace, ...actors);
   }
-  return line;
+  return line(...parts);
 }
 
 /**
@@ -32,26 +34,23 @@ function renderTask(task: JourneyTask): string {
  */
 export function renderJourney(ast: JourneyAST, options?: RenderOptions): string {
   const opts = resolveOptions(options);
-  const indent = opts.indent;
-  const lines: string[] = [];
-
-  // Header
-  lines.push('journey');
+  const body: Doc[] = [];
 
   // Title
   if (ast.title) {
-    lines.push(`${indent}title ${ast.title}`);
+    body.push(line('title', space, ast.title));
   }
 
   // Sections and tasks
   for (const section of ast.sections) {
     if (section.name) {
-      lines.push(`${indent}section ${section.name}`);
+      body.push(line('section', space, section.name));
     }
-    for (const task of section.tasks) {
-      lines.push(`${indent}${indent}${renderTask(task)}`);
-    }
+    body.push(indent(section.tasks.map(renderTask)));
   }
 
-  return lines.join('\n');
+  return render(['journey', indent(body)], {
+    indent: opts.indent,
+    whitespace: opts.whitespace,
+  });
 }

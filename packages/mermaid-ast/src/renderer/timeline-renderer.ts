@@ -7,6 +7,7 @@
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
 import type { TimelineAST } from '../types/timeline.js';
+import { type Doc, indent, line, render, space } from './doc.js';
 
 /**
  * Render options for timeline diagrams
@@ -17,39 +18,35 @@ export interface TimelineRenderOptions {
 }
 
 /**
- * Render a Timeline AST to Mermaid syntax
+ * Render a Timeline AST to Mermaid syntax.
+ *
+ * The grammar requires a space after the "title" and "section" keywords and after the
+ * ":" that starts an event, so those separators are always kept.
  */
 export function renderTimeline(ast: TimelineAST, options?: RenderOptions): string {
   const opts = resolveOptions(options);
-  const indent = opts.indent;
-  const lines: string[] = [];
+  const body: Doc[] = [];
 
-  // Header
-  lines.push('timeline');
-
-  // Title
   if (ast.title) {
-    lines.push(`${indent}title ${ast.title}`);
+    body.push(indent(line('title', space, ast.title)));
   }
 
-  // Sections and periods
   for (const section of ast.sections) {
     if (section.name) {
-      lines.push(`${indent}section ${section.name}`);
+      body.push(indent(line('section', space, section.name)));
     }
 
     for (const period of section.periods) {
-      // Period name
-      if (period.name) {
-        lines.push(`${indent}${indent}${period.name}`);
-      }
-
-      // Events under this period
-      for (const event of period.events) {
-        lines.push(`${indent}${indent}${indent}: ${event.text}`);
-      }
+      body.push(
+        indent(
+          indent([
+            period.name,
+            ...period.events.map((event) => indent(line(':', space, event.text))),
+          ])
+        )
+      );
     }
   }
 
-  return lines.join('\n');
+  return render(['timeline', body], { indent: opts.indent, whitespace: opts.whitespace });
 }

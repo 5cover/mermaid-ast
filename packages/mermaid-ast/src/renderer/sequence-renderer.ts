@@ -29,7 +29,14 @@ import type {
   SequenceStatement,
 } from '../types/sequence.js';
 import { assertNever } from '../utils.js';
-import { block, type Doc, indent, render } from './doc.js';
+import { block, type Doc, indent, line, render, softSpace } from './doc.js';
+
+/**
+ * Head followed by a colon and a text payload. Empty text keeps the pretty form.
+ */
+function withText(head: string, text: string): Doc {
+  return text ? line(`${head}:`, softSpace, text) : `${head}: ${text}`;
+}
 
 /**
  * Convert arrow type to Mermaid syntax
@@ -75,18 +82,15 @@ function renderStatement(stmt: SequenceStatement): Doc {
       if (msg.deactivate) {
         arrow = `${arrow}-`;
       }
-      let line = `${msg.from}${arrow}${msg.to}`;
-      if (msg.text) {
-        line += `: ${msg.text}`;
-      }
-      return line;
+      const head = `${msg.from}${arrow}${msg.to}`;
+      return msg.text ? withText(head, msg.text) : head;
     }
 
     case 'note': {
       const note = stmt as SequenceNote;
       const placement = note.placement.replace('_', ' ');
       const actors = note.actors.join(',');
-      return `note ${placement} ${actors}: ${note.text}`;
+      return withText(`note ${placement} ${actors}`, note.text);
     }
 
     case 'activate': {
@@ -180,24 +184,24 @@ function renderStatement(stmt: SequenceStatement): Doc {
 
     case 'link': {
       const link = stmt as SequenceLink;
-      return `link ${link.actor}: ${link.text} @ ${link.url}`;
+      return withText(`link ${link.actor}`, `${link.text} @ ${link.url}`);
     }
 
     case 'links': {
       const links = stmt as SequenceLinks;
       const linksJson = JSON.stringify(links.links);
-      return `links ${links.actor}: ${linksJson}`;
+      return withText(`links ${links.actor}`, linksJson);
     }
 
     case 'properties': {
       const props = stmt as SequenceProperties;
       const propsJson = JSON.stringify(props.properties);
-      return `properties ${props.actor}: ${propsJson}`;
+      return withText(`properties ${props.actor}`, propsJson);
     }
 
     case 'details': {
       const details = stmt as SequenceDetails;
-      return `details ${details.actor}: ${details.details}`;
+      return withText(`details ${details.actor}`, details.details);
     }
 
     default:
@@ -324,5 +328,5 @@ export function renderSequence(ast: SequenceAST, options?: RenderOptions): strin
     ]),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

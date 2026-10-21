@@ -16,7 +16,19 @@ import type {
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
 import { assertNever } from '../utils.js';
-import { block, type Doc, indent, render, when } from './doc.js';
+import { type Doc, indent, line, render, softSpace, spaceWhen, when } from './doc.js';
+
+/**
+ * Space between the parts of a relation. Compact output drops it, except where the parts
+ * would lex as one token: an aggregation "o" that meets a name ("Ao--", "oB"), or a "-"
+ * that meets a "-" from a name or a line.
+ */
+const relationSpace = spaceWhen(
+  (left, right) =>
+    (/[\p{L}\p{N}_-]$/u.test(left) && right.startsWith('o')) ||
+    (left.endsWith('o') && /^[\p{L}\p{N}_]/u.test(right)) ||
+    (left.endsWith('-') && right.startsWith('-'))
+);
 
 /**
  * Render relation type to symbol
@@ -57,22 +69,27 @@ function renderLineType(lineType: LineType): string {
 /**
  * Render a relationship to a string
  */
-function renderRelation(relation: ClassRelation): string {
+function renderRelation(relation: ClassRelation): Doc {
   const { id1, id2, relation: rel, relationTitle1, relationTitle2, title } = relation;
 
   const startType = renderRelationType(rel.type1, true);
   const endType = renderRelationType(rel.type2, false);
-  const line = renderLineType(rel.lineType);
-  const arrow = `${startType}${line}${endType}`;
+  const lineSymbol = renderLineType(rel.lineType);
+  const arrow = `${startType}${lineSymbol}${endType}`;
 
-  let result = id1;
-  if (relationTitle1) result += ` "${relationTitle1}"`;
-  result += ` ${arrow}`;
-  if (relationTitle2) result += ` "${relationTitle2}"`;
-  result += ` ${id2}`;
-  if (title) result += ` : ${title}`;
-
-  return result;
+  const quoted = (text?: string) => (text ? `"${text}"` : '');
+  return line(
+    id1,
+    relationSpace,
+    quoted(relationTitle1),
+    relationSpace,
+    arrow,
+    relationSpace,
+    quoted(relationTitle2),
+    relationSpace,
+    id2,
+    ...(title ? [softSpace, ':', softSpace, title] : [])
+  );
 }
 
 /**
@@ -91,8 +108,8 @@ function renderClass(cls: ClassDefinition, isReferencedInRelations: boolean): Do
   const hasLabel = cls.label && cls.label !== cls.id;
 
   if (hasBody) {
-    const header = hasLabel ? `class ${cls.id}["${cls.label}"] {` : `class ${cls.id} {`;
-    return block(header, cls.members.map(renderMember), '}');
+    const header = hasLabel ? `class ${cls.id}["${cls.label}"]` : `class ${cls.id}`;
+    return [line(header, softSpace, '{'), indent(cls.members.map(renderMember)), '}'];
   }
 
   if (hasLabel) {
@@ -112,7 +129,7 @@ function renderClass(cls: ClassDefinition, isReferencedInRelations: boolean): Do
  * Render annotations for a class to a Doc
  */
 function renderAnnotations(cls: ClassDefinition): Doc {
-  return cls.annotations.map((annotation) => `<<${annotation}>> ${cls.id}`);
+  return cls.annotations.map((annotation) => line(`<<${annotation}>>`, softSpace, cls.id));
 }
 
 /**
@@ -132,7 +149,7 @@ function renderNamespace(
     })
     .filter(Boolean);
 
-  return block(`namespace ${namespaceName} {`, classesDoc, '}');
+  return [line(`namespace ${namespaceName}`, softSpace, '{'), indent(classesDoc), '}'];
 }
 
 /**
@@ -140,7 +157,9 @@ function renderNamespace(
  */
 function renderNotes(notes: ClassNote[]): Doc {
   return notes.map((note) =>
-    note.forClass ? `note for ${note.forClass} "${note.text}"` : `note "${note.text}"`
+    note.forClass
+      ? line(`note for ${note.forClass}`, softSpace, `"${note.text}"`)
+      : `note "${note.text}"`
   );
 }
 
@@ -159,10 +178,10 @@ function renderClassDefs(ast: ClassDiagramAST): Doc {
  * Render CSS class assignments to a Doc
  */
 function renderCssClasses(ast: ClassDiagramAST): Doc {
-  const assignments: string[] = [];
+  const assignments: Doc[] = [];
   for (const [, cls] of ast.classes) {
     for (const cssClass of cls.cssClasses) {
-      assignments.push(`cssClass "${cls.id}" ${cssClass}`);
+      assignments.push(line(`cssClass "${cls.id}"`, softSpace, cssClass));
     }
   }
   return assignments;
@@ -172,16 +191,27 @@ function renderCssClasses(ast: ClassDiagramAST): Doc {
  * Render click handlers and links to a Doc
  */
 function renderClicks(ast: ClassDiagramAST): Doc {
-  const clicks: string[] = [];
+  const clicks: Doc[] = [];
   for (const [, cls] of ast.classes) {
     if (cls.link) {
-      const target = cls.linkTarget ? ` ${cls.linkTarget}` : '';
-      const tooltip = cls.tooltip ? ` "${cls.tooltip}"` : '';
-      clicks.push(`link ${cls.id} "${cls.link}"${tooltip}${target}`);
+      const tooltip = cls.tooltip ? `"${cls.tooltip}"` : '';
+      clicks.push(
+        line(
+          `link ${cls.id}`,
+          softSpace,
+          `"${cls.link}"`,
+          softSpace,
+          tooltip,
+          softSpace,
+          cls.linkTarget ?? ''
+        )
+      );
     } else if (cls.callback) {
       const args = cls.callbackArgs ? `("${cls.callbackArgs}")` : '';
-      const tooltip = cls.tooltip ? ` "${cls.tooltip}"` : '';
-      clicks.push(`callback ${cls.id} "${cls.callback}"${args}${tooltip}`);
+      const tooltip = cls.tooltip ? `"${cls.tooltip}"` : '';
+      clicks.push(
+        line(`callback ${cls.id}`, softSpace, `"${cls.callback}"${args}`, softSpace, tooltip)
+      );
     }
   }
   return clicks;
@@ -253,5 +283,5 @@ export function renderClassDiagram(ast: ClassDiagramAST, options?: RenderOptions
     ]),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

@@ -18,7 +18,7 @@ import type {
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
 import type { Doc } from './doc.js';
-import { block, indent, render, when } from './doc.js';
+import { indent, line, render, softSpace, space, when } from './doc.js';
 
 /**
  * Render state type annotation
@@ -33,7 +33,6 @@ function renderStateType(type: StateType): string | null {
       return '<<choice>>';
     case 'divider':
       return null; // Dividers are rendered as ---
-    case 'default':
     default:
       return null;
   }
@@ -69,12 +68,12 @@ function renderState(state: StateDefinition, statesInTransitions: Set<string>): 
         nestedContent.push(`direction ${stmt.value}`);
       }
     }
-    return block(`state ${id} {`, nestedContent, '}');
+    return [line('state', space, id, softSpace, '{'), indent(nestedContent), '}'];
   }
 
   // Handle state type annotations (fork, join, choice)
   if (typeAnnotation) {
-    return `state ${id} ${typeAnnotation}`;
+    return line('state', space, id, softSpace, typeAnnotation);
   }
 
   // Handle state with description
@@ -82,7 +81,7 @@ function renderState(state: StateDefinition, statesInTransitions: Set<string>): 
     const desc = Array.isArray(state.description)
       ? state.description.join('\\n')
       : state.description;
-    return `${id} : ${desc}`;
+    return line(id, softSpace, ':', softSpace, desc);
   }
 
   // Simple state - only declare if not referenced in transitions
@@ -96,22 +95,43 @@ function renderState(state: StateDefinition, statesInTransitions: Set<string>): 
 /**
  * Render a transition
  */
-function renderTransition(transition: StateTransition): string {
+function renderTransition(transition: StateTransition): Doc {
   const from = renderStateId(transition.state1);
   const to = renderStateId(transition.state2);
 
   if (transition.description) {
-    return `${from} --> ${to} : ${transition.description}`;
+    return line(
+      from,
+      softSpace,
+      '-->',
+      softSpace,
+      to,
+      softSpace,
+      ':',
+      softSpace,
+      transition.description
+    );
   }
-  return `${from} --> ${to}`;
+  return line(from, softSpace, '-->', softSpace, to);
 }
 
 /**
- * Render a note
+ * Render a note. The space after the colon stays in compact output: the parser
+ * drops the first two characters of the note text, so "A:text" would lose a letter.
  */
 function renderNote(state: StateDefinition): Doc {
   if (!state.note) return null;
-  return `note ${state.note.position} ${state.id} : ${state.note.text}`;
+  return line(
+    'note',
+    space,
+    state.note.position,
+    space,
+    state.id,
+    softSpace,
+    ':',
+    space,
+    state.note.text
+  );
 }
 
 /**
@@ -177,8 +197,8 @@ export function renderStateDiagram(ast: StateDiagramAST, options?: RenderOptions
       when(ast.direction && ast.direction !== 'TB', `direction ${ast.direction}`),
 
       // Accessibility
-      when(ast.title, `accTitle: ${ast.title}`),
-      when(ast.accDescription, `accDescr: ${ast.accDescription}`),
+      ast.title ? line('accTitle:', softSpace, ast.title) : null,
+      ast.accDescription ? line('accDescr:', softSpace, ast.accDescription) : null,
 
       // State definitions (with type annotations)
       ...stateEntries
@@ -210,5 +230,5 @@ export function renderStateDiagram(ast: StateDiagramAST, options?: RenderOptions
     ]),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

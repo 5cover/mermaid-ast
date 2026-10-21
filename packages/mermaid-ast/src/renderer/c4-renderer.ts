@@ -27,8 +27,8 @@ import {
 } from '../types/c4.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
-import type { Doc } from './doc.js';
-import { indent, render, when } from './doc.js';
+import type { Doc, LinePart } from './doc.js';
+import { indent, line, render, softSpace, when } from './doc.js';
 
 /**
  * Escape double quotes in strings
@@ -38,9 +38,16 @@ function escapeQuotes(str: string): string {
 }
 
 /**
+ * Join values with a comma, followed by an optional space
+ */
+function joinAttributes(values: string[]): LinePart[] {
+  return values.flatMap<LinePart>((value, i) => (i === 0 ? [value] : [',', softSpace, value]));
+}
+
+/**
  * Format attributes as comma-separated quoted strings
  */
-function formatAttributes(...attrs: (string | undefined)[]): string {
+function formatAttributes(...attrs: (string | undefined)[]): LinePart[] {
   const parts: string[] = [];
   for (const attr of attrs) {
     if (attr !== undefined && attr !== '') {
@@ -53,7 +60,7 @@ function formatAttributes(...attrs: (string | undefined)[]): string {
   while (parts.length > 0 && parts[parts.length - 1] === '""') {
     parts.pop();
   }
-  return parts.join(', ');
+  return joinAttributes(parts);
 }
 
 /**
@@ -183,7 +190,7 @@ function getRelationshipKeyword(type: C4Relationship['type']): string {
 /**
  * Render a person element
  */
-function renderPerson(person: C4Person): string {
+function renderPerson(person: C4Person): Doc {
   const keyword = getPersonKeyword(person.type);
   const attrs = formatAttributes(
     person.alias,
@@ -193,13 +200,13 @@ function renderPerson(person: C4Person): string {
     person.tags,
     person.link
   );
-  return `${keyword}(${attrs})`;
+  return line(`${keyword}(`, ...attrs, ')');
 }
 
 /**
  * Render a system element
  */
-function renderSystem(system: C4System): string {
+function renderSystem(system: C4System): Doc {
   const keyword = getSystemKeyword(system.type);
   const attrs = formatAttributes(
     system.alias,
@@ -209,13 +216,13 @@ function renderSystem(system: C4System): string {
     system.tags,
     system.link
   );
-  return `${keyword}(${attrs})`;
+  return line(`${keyword}(`, ...attrs, ')');
 }
 
 /**
  * Render a container element
  */
-function renderContainer(container: C4Container): string {
+function renderContainer(container: C4Container): Doc {
   const keyword = getContainerKeyword(container.type);
   const attrs = formatAttributes(
     container.alias,
@@ -226,13 +233,13 @@ function renderContainer(container: C4Container): string {
     container.tags,
     container.link
   );
-  return `${keyword}(${attrs})`;
+  return line(`${keyword}(`, ...attrs, ')');
 }
 
 /**
  * Render a component element
  */
-function renderComponent(component: C4Component): string {
+function renderComponent(component: C4Component): Doc {
   const keyword = getComponentKeyword(component.type);
   const attrs = formatAttributes(
     component.alias,
@@ -243,7 +250,7 @@ function renderComponent(component: C4Component): string {
     component.tags,
     component.link
   );
-  return `${keyword}(${attrs})`;
+  return line(`${keyword}(`, ...attrs, ')');
 }
 
 /**
@@ -254,7 +261,7 @@ function renderBoundary(boundary: C4Boundary): Doc {
   const attrs = formatAttributes(boundary.alias, boundary.label, boundary.tags, boundary.link);
 
   return [
-    `${keyword}(${attrs}) {`,
+    line(`${keyword}(`, ...attrs, ')', softSpace, '{'),
     indent(boundary.children.map((child) => renderElement(child))),
     '}',
   ];
@@ -276,7 +283,7 @@ function renderDeploymentNode(node: C4DeploymentNode): Doc {
   );
 
   return [
-    `${keyword}(${attrs}) {`,
+    line(`${keyword}(`, ...attrs, ')', softSpace, '{'),
     indent(node.children.map((child) => renderElement(child))),
     '}',
   ];
@@ -310,7 +317,7 @@ function renderElement(element: C4Element): Doc {
 /**
  * Render a relationship
  */
-function renderRelationship(rel: C4Relationship): string {
+function renderRelationship(rel: C4Relationship): Doc {
   const keyword = getRelationshipKeyword(rel.type);
   const attrs = formatAttributes(
     rel.from,
@@ -322,13 +329,13 @@ function renderRelationship(rel: C4Relationship): string {
     rel.tags,
     rel.link
   );
-  return `${keyword}(${attrs})`;
+  return line(`${keyword}(`, ...attrs, ')');
 }
 
 /**
  * Render an element style update
  */
-function renderElementStyle(style: C4ElementStyle): string {
+function renderElementStyle(style: C4ElementStyle): Doc {
   const attrs = formatAttributes(
     style.elementName,
     style.bgColor,
@@ -341,20 +348,20 @@ function renderElementStyle(style: C4ElementStyle): string {
     style.legendText,
     style.legendSprite
   );
-  return `UpdateElementStyle(${attrs})`;
+  return line('UpdateElementStyle(', ...attrs, ')');
 }
 
 /**
  * Render a relationship style update
  */
-function renderRelationshipStyle(style: C4RelationshipStyle): string {
+function renderRelationshipStyle(style: C4RelationshipStyle): Doc {
   const attrs: string[] = [`"${escapeQuotes(style.from)}"`, `"${escapeQuotes(style.to)}"`];
   if (style.textColor) attrs.push(`"${escapeQuotes(style.textColor)}"`);
   if (style.lineColor) attrs.push(`"${escapeQuotes(style.lineColor)}"`);
   if (style.offsetX !== undefined) attrs.push(String(style.offsetX));
   if (style.offsetY !== undefined) attrs.push(String(style.offsetY));
 
-  return `UpdateRelStyle(${attrs.join(', ')})`;
+  return line('UpdateRelStyle(', ...joinAttributes(attrs), ')');
 }
 
 /**
@@ -374,8 +381,8 @@ export function renderC4(ast: C4AST, options?: RenderOptions): string {
     when(ast.title, `title ${ast.title}`),
 
     // Accessibility
-    when(ast.accTitle, `accTitle: ${ast.accTitle}`),
-    when(ast.accDescr, `accDescr: ${ast.accDescr}`),
+    ast.accTitle ? line('accTitle:', softSpace, ast.accTitle) : null,
+    ast.accDescr ? line('accDescr:', softSpace, ast.accDescr) : null,
 
     // Elements
     indent(ast.elements.map((element) => renderElement(element))),
@@ -398,9 +405,11 @@ export function renderC4(ast: C4AST, options?: RenderOptions): string {
       if (ast.layoutConfig?.c4BoundaryInRow !== undefined) {
         attrs.push(String(ast.layoutConfig.c4BoundaryInRow));
       }
-      return attrs.length > 0 ? indent([`UpdateLayoutConfig(${attrs.join(', ')})`]) : null;
+      return attrs.length > 0
+        ? indent([line('UpdateLayoutConfig(', ...joinAttributes(attrs), ')')])
+        : null;
     }),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

@@ -13,7 +13,7 @@ import type {
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
 import type { Doc } from './doc.js';
-import { indent, render as renderDoc } from './doc.js';
+import { indent, line, render as renderDoc, softSpace, space } from './doc.js';
 
 /**
  * Map requirement type to Mermaid syntax
@@ -42,20 +42,26 @@ function requirementTypeToString(type: Requirement['requirementType']): string {
  */
 function renderRequirementDef(name: string, req: Requirement, classes: string[] | undefined): Doc {
   const classStr = classes && classes.length > 0 ? `:::${classes.join(',')}` : '';
-  const header = `${requirementTypeToString(req.requirementType)} ${name}${classStr} {`;
+  const header = line(
+    requirementTypeToString(req.requirementType),
+    space,
+    `${name}${classStr}`,
+    softSpace,
+    '{'
+  );
 
   const body: Doc[] = [];
   if (req.id !== undefined) {
-    body.push(`id: ${req.id}`);
+    body.push(line('id:', softSpace, req.id));
   }
   if (req.text !== undefined) {
-    body.push(`text: ${req.text}`);
+    body.push(line('text:', softSpace, req.text));
   }
   if (req.risk !== undefined) {
-    body.push(`risk: ${req.risk}`);
+    body.push(line('risk:', softSpace, req.risk));
   }
   if (req.verifyMethod !== undefined) {
-    body.push(`verifymethod: ${req.verifyMethod}`);
+    body.push(line('verifymethod:', softSpace, req.verifyMethod));
   }
 
   return [header, indent(body), '}'];
@@ -70,14 +76,14 @@ function renderElementDef(
   classes: string[] | undefined
 ): Doc {
   const classStr = classes && classes.length > 0 ? `:::${classes.join(',')}` : '';
-  const header = `element ${name}${classStr} {`;
+  const header = line('element', space, `${name}${classStr}`, softSpace, '{');
 
   const body: Doc[] = [];
   if (elem.type !== undefined) {
-    body.push(`type: ${elem.type}`);
+    body.push(line('type:', softSpace, elem.type));
   }
   if (elem.docRef !== undefined) {
-    body.push(`docref: ${elem.docRef}`);
+    body.push(line('docref:', softSpace, elem.docRef));
   }
 
   return [header, indent(body), '}'];
@@ -86,9 +92,19 @@ function renderElementDef(
 /**
  * Render a relationship
  */
-function renderRelationshipLine(rel: RequirementRelationship): string {
+function renderRelationshipLine(rel: RequirementRelationship): Doc {
   // Format: source - relationshipType -> target
-  return `${rel.source} - ${rel.relationshipType} -> ${rel.target}`;
+  return line(
+    rel.source,
+    softSpace,
+    '-',
+    softSpace,
+    rel.relationshipType,
+    softSpace,
+    '->',
+    softSpace,
+    rel.target
+  );
 }
 
 /**
@@ -106,10 +122,10 @@ export function renderRequirement(ast: RequirementAST, options?: RenderOptions):
 
   // Accessibility
   if (ast.accTitle) {
-    body.push(`accTitle: ${ast.accTitle}`);
+    body.push(line('accTitle:', softSpace, ast.accTitle));
   }
   if (ast.accDescription) {
-    body.push(`accDescr: ${ast.accDescription}`);
+    body.push(line('accDescr:', softSpace, ast.accDescription));
   }
 
   // Direction
@@ -146,5 +162,5 @@ export function renderRequirement(ast: RequirementAST, options?: RenderOptions):
 
   doc.push(indent(body));
 
-  return renderDoc(doc, opts.indent);
+  return renderDoc(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

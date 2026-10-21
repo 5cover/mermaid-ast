@@ -4,8 +4,8 @@
  * Renders BlockAST back to Mermaid block-beta diagram syntax.
  */
 
-import type { Doc } from './doc.js';
-import { indent, render, when } from './doc.js';
+import type { Doc, LinePart } from './doc.js';
+import { indent, line, render, softSpace, spaceWhen, when } from './doc.js';
 import type {
   BlockAST,
   BlockApplyClass,
@@ -83,25 +83,59 @@ function getEdgeString(edgeType: string): string {
 }
 
 /**
- * Renders a single block node
+ * Separator before an edge connector. A connector starting with "=" or "~" would
+ * merge into a preceding bare node id, so compact output keeps a space there.
  */
-function renderNode(node: BlockNode): Doc {
+const linkBefore = spaceWhen((_, connector) => /^[=~]/.test(connector));
+
+/**
+ * Separator after an edge connector. Compact output keeps a space where the
+ * connector would absorb the target: after "=" or "~" runs, and after "---"
+ * before a target starting with "x" or "o".
+ */
+const linkAfter = spaceWhen(
+  (connector, target) =>
+    /[=~]$/.test(connector) || (connector.endsWith('-') && /^[xo]/.test(target))
+);
+
+/**
+ * Parts of a block node. Directions of a block arrow are separated by an optional space.
+ */
+function nodeParts(node: BlockNode): LinePart[] {
   const [open, close] = getShapeDelimiters(node.shape);
   const label = node.label || node.id;
 
-  let result = `${node.id}${open}"${label}"${close}`;
-
-  // Add directions for block arrows
-  if (node.shape === 'block-arrow' && node.directions && node.directions.length > 0) {
-    result = `${node.id}<["${label}"]>(${node.directions.join(', ')})`;
-  }
+  const parts: LinePart[] =
+    node.shape === 'block-arrow' && node.directions && node.directions.length > 0
+      ? [
+          `${node.id}<["${label}"]>(`,
+          ...node.directions.flatMap<LinePart>((d, i) => (i === 0 ? [d] : [',', softSpace, d])),
+          ')',
+        ]
+      : [`${node.id}${open}"${label}"${close}`];
 
   // Add width if not default
   if (node.widthInColumns > 1) {
-    result += `:${node.widthInColumns}`;
+    parts.push(`:${node.widthInColumns}`);
   }
 
-  return result;
+  return parts;
+}
+
+/**
+ * Renders a single block node
+ */
+function renderNode(node: BlockNode): Doc {
+  return line(...nodeParts(node));
+}
+
+/**
+ * Connector text for an edge, with the label between the stroke parts
+ */
+function connectorText(edge: BlockEdge): string {
+  const edgeStr = getEdgeString(edge.edgeType);
+  if (!edge.label) return edgeStr;
+  return `${edgeStr.substring(0, 2)}"${edge.label}"${edgeStr.substring(2)}`;
 }
 
 /**
@@ -149,14 +183,7 @@ function renderApplyStyles(applyStyles: BlockApplyStyles): Doc {
  * Renders an edge
  */
 function renderEdge(edge: BlockEdge): Doc {
-  const edgeStr = getEdgeString(edge.edgeType);
-  if (edge.label) {
-    // Edge with label uses different syntax
-    const startEdge = edgeStr.substring(0, 2); // '--' or '==' or '-.'
-    const endEdge = edgeStr.substring(2); // '>' or '-' or '>'
-    return `${edge.start} ${startEdge}"${edge.label}"${endEdge} ${edge.end}`;
-  }
-  return `${edge.start} ${edgeStr} ${edge.end}`;
+  return line(edge.start, linkBefore, connectorText(edge), linkAfter, edge.end);
 }
 
 /**
@@ -262,12 +289,12 @@ export function renderBlock(ast: BlockAST, options?: RenderOptions): string {
 
   const doc: Doc = [
     'block-beta',
-    when(ast.accTitle, `accTitle: ${ast.accTitle}`),
-    when(ast.accDescr, `accDescr: ${ast.accDescr}`),
+    ast.accTitle ? line('accTitle:', softSpace, ast.accTitle) : null,
+    ast.accDescr ? line('accDescr:', softSpace, ast.accDescr) : null,
     indent(renderedElements),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }
 
 /**
@@ -292,23 +319,16 @@ function renderNodeWithEdges(
   // For now, just render node --> target for each edge
   // (More complex chain building would require graph analysis)
 
-  const parts: string[] = [renderNode(node) as string];
+  const parts: LinePart[] = [...nodeParts(node)];
   renderedNodes.add(node.id);
 
   for (const edge of edges) {
-    const edgeStr = getEdgeString(edge.edgeType);
     const targetNode = nodeMap.get(edge.end);
 
-    if (edge.label) {
-      const startEdge = edgeStr.substring(0, 2);
-      const endEdge = edgeStr.substring(2);
-      parts.push(`${startEdge}"${edge.label}"${endEdge}`);
-    } else {
-      parts.push(edgeStr);
-    }
+    parts.push(linkBefore, connectorText(edge), linkAfter);
 
     if (targetNode && !renderedNodes.has(edge.end)) {
-      parts.push(renderNode(targetNode) as string);
+      parts.push(...nodeParts(targetNode));
       renderedNodes.add(edge.end);
     } else {
       // Target already rendered or not found, just use the ID
@@ -316,5 +336,5 @@ function renderNodeWithEdges(
     }
   }
 
-  return parts.join(' ');
+  return line(...parts);
 }

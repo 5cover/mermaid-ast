@@ -13,6 +13,7 @@ import type {
 } from '../types/er.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
+import { type Doc, indent, line, render, softSpace, space, spaceWhen } from './doc.js';
 
 /**
  * Render options for ER diagrams
@@ -67,21 +68,43 @@ function renderRelSpec(rel: ErRelationship): string {
   return `${leftCard}${relType}${rightCard}`;
 }
 
+/** Characters that Mermaid lexes as part of a name token */
+const isNameChar = (c: string) => /[\w*-]/.test(c) || c.charCodeAt(0) > 0x7f;
+const endsWithName = (s: string) => isNameChar(s.charAt(s.length - 1));
+const startsWithName = (s: string) => isNameChar(s.charAt(0));
+
 /**
- * Render an attribute
+ * Space between an entity and its relationship spec. Compact output keeps it only where
+ * the text would lex differently: two name characters running together, or the entity "o"
+ * before "|" (which would read as the "o|" cardinality).
  */
-function renderAttribute(attr: ErAttribute, indent: string): string {
-  let result = `${indent}${attr.type} ${attr.name}`;
+const specSeparator = spaceWhen(
+  (entity, spec) =>
+    (endsWithName(entity) && startsWithName(spec)) ||
+    (entity.toLowerCase() === 'o' && spec.startsWith('|'))
+);
+
+/** Space between a relationship spec and the second entity */
+const specTailSeparator = spaceWhen((spec, entity) => endsWithName(spec) && startsWithName(entity));
+
+/** Space before "{" that would otherwise join the entity "o" into the "o{" cardinality */
+const blockSeparator = spaceWhen((head) => head.toLowerCase() === 'o');
+
+/**
+ * Convert an attribute to Mermaid syntax
+ */
+function renderAttribute(attr: ErAttribute): Doc {
+  const parts = [attr.type, space, attr.name];
 
   if (attr.keys && attr.keys.length > 0) {
-    result += ` ${attr.keys.join(',')}`;
+    parts.push(space, attr.keys.join(','));
   }
 
   if (attr.comment) {
-    result += ` "${attr.comment}"`;
+    parts.push(space, `"${attr.comment}"`);
   }
 
-  return result;
+  return line(...parts);
 }
 
 /**
@@ -100,29 +123,25 @@ function quoteEntityName(name: string): string {
  */
 export function renderErDiagram(ast: ErDiagramAST, options?: RenderOptions): string {
   const opts = resolveOptions(options);
-  const indent = opts.indent;
-  const lines: string[] = [];
-
-  // Header
-  lines.push('erDiagram');
+  const body: Doc[] = [];
 
   // Direction (if not default)
   if (ast.direction && ast.direction !== 'TB') {
-    lines.push(`${indent}direction ${ast.direction}`);
+    body.push(line('direction', space, ast.direction));
   }
 
   // Accessibility
   if (ast.accTitle) {
-    lines.push(`${indent}accTitle: ${ast.accTitle}`);
+    body.push(line('accTitle:', softSpace, ast.accTitle));
   }
   if (ast.accDescription) {
-    lines.push(`${indent}accDescr: ${ast.accDescription}`);
+    body.push(line('accDescr:', softSpace, ast.accDescription));
   }
 
   // Class definitions
   for (const [name, classDef] of ast.classDefs) {
     if (classDef.styles.length > 0) {
-      lines.push(`${indent}classDef ${name} ${classDef.styles.join(',')}`);
+      body.push(line('classDef', space, name, space, classDef.styles.join(',')));
     }
   }
 
@@ -132,16 +151,17 @@ export function renderErDiagram(ast: ErDiagramAST, options?: RenderOptions): str
     const classAssignment = ast.classes.get(name);
     const classStr = classAssignment ? `:::${classAssignment.join(',')}` : '';
     const aliasStr = entity.alias ? `["${entity.alias}"]` : '';
+    const head = `${entityName}${aliasStr}${classStr}`;
 
     if (entity.attributes.length > 0) {
-      lines.push(`${indent}${entityName}${aliasStr}${classStr} {`);
-      for (const attr of entity.attributes) {
-        lines.push(renderAttribute(attr, indent + indent));
-      }
-      lines.push(`${indent}}`);
+      body.push([
+        line(head, blockSeparator, '{'),
+        indent(entity.attributes.map(renderAttribute)),
+        '}',
+      ]);
     } else if (aliasStr || classStr) {
       // Only output entity if it has alias or class
-      lines.push(`${indent}${entityName}${aliasStr}${classStr}`);
+      body.push(line(head));
     }
   }
 
@@ -152,15 +172,30 @@ export function renderErDiagram(ast: ErDiagramAST, options?: RenderOptions): str
     const relSpec = renderRelSpec(rel);
     const role = rel.role.includes(' ') ? `"${rel.role}"` : rel.role;
 
-    lines.push(`${indent}${entityA} ${relSpec} ${entityB} : ${role}`);
+    body.push(
+      line(
+        entityA,
+        specSeparator,
+        relSpec,
+        specTailSeparator,
+        entityB,
+        softSpace,
+        ':',
+        softSpace,
+        role
+      )
+    );
   }
 
   // Style assignments
   for (const [id, styles] of ast.styles) {
     if (styles.length > 0) {
-      lines.push(`${indent}style ${id} ${styles.join(',')}`);
+      body.push(line('style', space, id, space, styles.join(',')));
     }
   }
 
-  return lines.join('\n');
+  return render(['erDiagram', indent(body)], {
+    indent: opts.indent,
+    whitespace: opts.whitespace,
+  });
 }

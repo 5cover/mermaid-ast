@@ -7,6 +7,7 @@
 import type { GanttAST, GanttTask } from '../types/gantt.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
+import { type Doc, indent, type LinePart, line, render, softSpace, space } from './doc.js';
 
 /**
  * Render options for Gantt charts
@@ -19,10 +20,10 @@ export interface GanttRenderOptions {
 /**
  * Render a task to Mermaid syntax
  */
-function renderTask(task: GanttTask, indent: string): string {
+function renderTask(task: GanttTask): Doc {
   // If we have raw data, use it for better round-trip fidelity
   if (task.rawData) {
-    return `${indent}${task.name}${task.rawData}`;
+    return line(task.name, task.rawData);
   }
 
   // Otherwise, reconstruct from parsed data
@@ -44,8 +45,12 @@ function renderTask(task: GanttTask, indent: string): string {
     parts.push(task.end);
   }
 
-  const dataStr = parts.length > 0 ? `: ${parts.join(', ')}` : '';
-  return `${indent}${task.name}${dataStr}`;
+  if (parts.length === 0) {
+    return line(task.name);
+  }
+
+  const data: LinePart[] = parts.flatMap((part, i) => (i === 0 ? [part] : [',', softSpace, part]));
+  return line(task.name, ':', softSpace, ...data);
 }
 
 /**
@@ -53,96 +58,91 @@ function renderTask(task: GanttTask, indent: string): string {
  */
 export function renderGantt(ast: GanttAST, options?: RenderOptions): string {
   const opts = resolveOptions(options);
-  const indent = opts.indent;
-  const lines: string[] = [];
+  const body: Doc[] = [];
 
-  // Header
-  lines.push('gantt');
-
-  // Title
   if (ast.title) {
-    lines.push(`${indent}title ${ast.title}`);
+    body.push(line('title', space, ast.title));
   }
 
   // Accessibility
   if (ast.accTitle) {
-    lines.push(`${indent}accTitle: ${ast.accTitle}`);
+    body.push(line('accTitle:', softSpace, ast.accTitle));
   }
   if (ast.accDescription) {
-    lines.push(`${indent}accDescr: ${ast.accDescription}`);
+    body.push(line('accDescr:', softSpace, ast.accDescription));
   }
 
   // Date/axis format
   if (ast.dateFormat) {
-    lines.push(`${indent}dateFormat ${ast.dateFormat}`);
+    body.push(line('dateFormat', space, ast.dateFormat));
   }
   if (ast.axisFormat) {
-    lines.push(`${indent}axisFormat ${ast.axisFormat}`);
+    body.push(line('axisFormat', space, ast.axisFormat));
   }
   if (ast.tickInterval) {
-    lines.push(`${indent}tickInterval ${ast.tickInterval}`);
+    body.push(line('tickInterval', space, ast.tickInterval));
   }
 
   // Options
   if (ast.inclusiveEndDates) {
-    lines.push(`${indent}inclusiveEndDates`);
+    body.push('inclusiveEndDates');
   }
   if (ast.topAxis) {
-    lines.push(`${indent}topAxis`);
+    body.push('topAxis');
   }
 
   // Excludes/includes
   if (ast.excludes) {
-    lines.push(`${indent}excludes ${ast.excludes}`);
+    body.push(line('excludes', space, ast.excludes));
   }
   if (ast.includes) {
-    lines.push(`${indent}includes ${ast.includes}`);
+    body.push(line('includes', space, ast.includes));
   }
 
   // Today marker
   if (ast.todayMarker) {
-    lines.push(`${indent}todayMarker ${ast.todayMarker}`);
+    body.push(line('todayMarker', space, ast.todayMarker));
   }
 
   // Weekday/weekend
   if (ast.weekday) {
-    lines.push(`${indent}weekday ${ast.weekday}`);
+    body.push(line('weekday', space, ast.weekday));
   }
   if (ast.weekend) {
-    lines.push(`${indent}weekend ${ast.weekend}`);
+    body.push(line('weekend', space, ast.weekend));
   }
 
   // Tasks without section
   for (const task of ast.tasks) {
-    lines.push(renderTask(task, indent));
+    body.push(renderTask(task));
   }
 
   // Sections with tasks
   for (const section of ast.sections) {
-    lines.push(`${indent}section ${section.name}`);
+    // An empty name keeps its trailing space here: line() would drop it and "section" alone does not parse
+    body.push(section.name ? line('section', space, section.name) : 'section ');
     for (const task of section.tasks) {
-      lines.push(renderTask(task, indent));
+      body.push(renderTask(task));
     }
   }
 
   // Click events
   for (const click of ast.clickEvents) {
-    let clickLine = `${indent}click ${click.taskId}`;
+    if (!click.callback && !click.href) {
+      continue;
+    }
+    const parts: LinePart[] = ['click', space, click.taskId];
     if (click.callback) {
-      clickLine += ` call ${click.callback}`;
-      if (click.callbackArgs) {
-        clickLine += `(${click.callbackArgs})`;
-      } else {
-        clickLine += '()';
-      }
+      parts.push(space, 'call', space, `${click.callback}(${click.callbackArgs ?? ''})`);
     }
     if (click.href) {
-      clickLine += ` href "${click.href}"`;
+      parts.push(space, 'href', space, `"${click.href}"`);
     }
-    if (clickLine !== `${indent}click ${click.taskId}`) {
-      lines.push(clickLine);
-    }
+    body.push(line(...parts));
   }
 
-  return lines.join('\n');
+  return render(['gantt', indent(body)], {
+    indent: opts.indent,
+    whitespace: opts.whitespace,
+  });
 }

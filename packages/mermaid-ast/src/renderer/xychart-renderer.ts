@@ -7,8 +7,22 @@
 import type { XYChartAST } from '../types/xychart.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
-import type { Doc } from './doc.js';
-import { indent, render, when } from './doc.js';
+import type { Doc, LinePart } from './doc.js';
+import { indent, line, render, softSpace, space, when } from './doc.js';
+
+/**
+ * Comma-separated list items. The comma is always followed by an optional space.
+ */
+function joinItems(items: string[]): LinePart[] {
+  return items.flatMap((item, i) => (i === 0 ? [item] : [',', softSpace, item]));
+}
+
+/**
+ * Numeric axis range: min --> max. The arrow may be spaced or not.
+ */
+function renderRange(min: number, max: number): LinePart[] {
+  return [`${min}`, softSpace, '-->', softSpace, `${max}`];
+}
 
 /**
  * Render X-axis configuration
@@ -16,24 +30,22 @@ import { indent, render, when } from './doc.js';
 function renderXAxis(xAxis: XYChartAST['xAxis']): Doc {
   if (!xAxis) return null;
 
-  const parts: string[] = [];
+  const parts: LinePart[] = [];
 
   // Add title if present
   if (xAxis.title) {
-    parts.push(`"${xAxis.title}"`);
+    parts.push(`"${xAxis.title}"`, softSpace);
   }
 
   // Add data based on type
   if (xAxis.type === 'band') {
     // Categorical bands: ["cat1", "cat2", ...]
-    const categories = xAxis.categories.map((c) => `"${c}"`).join(', ');
-    parts.push(`[${categories}]`);
+    parts.push('[', ...joinItems(xAxis.categories.map((c) => `"${c}"`)), ']');
   } else {
-    // Numeric range: min --> max
-    parts.push(`${xAxis.min} --> ${xAxis.max}`);
+    parts.push(...renderRange(xAxis.min, xAxis.max));
   }
 
-  return `x-axis ${parts.join(' ')}`;
+  return line('x-axis', space, ...parts);
 }
 
 /**
@@ -42,26 +54,32 @@ function renderXAxis(xAxis: XYChartAST['xAxis']): Doc {
 function renderYAxis(yAxis: XYChartAST['yAxis']): Doc {
   if (!yAxis) return null;
 
-  const parts: string[] = [];
+  const parts: LinePart[] = [];
 
   // Add title if present
   if (yAxis.title) {
-    parts.push(`"${yAxis.title}"`);
+    parts.push(`"${yAxis.title}"`, softSpace);
   }
 
   // Add range
-  parts.push(`${yAxis.min} --> ${yAxis.max}`);
+  parts.push(...renderRange(yAxis.min, yAxis.max));
 
-  return `y-axis ${parts.join(' ')}`;
+  return line('y-axis', space, ...parts);
 }
 
 /**
  * Render a data series (line or bar)
  */
-function renderSeries(series: XYChartAST['series'][0]): string {
-  const values = series.values.join(', ');
-  const label = series.label ? `"${series.label}" ` : '';
-  return `${series.type} ${label}[${values}]`;
+function renderSeries(series: XYChartAST['series'][0]): Doc {
+  const label: LinePart[] = series.label ? [`"${series.label}"`, softSpace] : [];
+  return line(
+    series.type,
+    space,
+    ...label,
+    '[',
+    ...joinItems(series.values.map((v) => `${v}`)),
+    ']'
+  );
 }
 
 /**
@@ -76,13 +94,13 @@ export function renderXYChart(ast: XYChartAST, options?: RenderOptions): string 
     header,
     indent([
       when(ast.title, () => `title "${ast.title}"`),
-      when(ast.accTitle, () => `accTitle: ${ast.accTitle}`),
-      when(ast.accDescription, () => `accDescr: ${ast.accDescription}`),
+      when(ast.accTitle, () => line('accTitle:', softSpace, String(ast.accTitle))),
+      when(ast.accDescription, () => line('accDescr:', softSpace, String(ast.accDescription))),
       renderXAxis(ast.xAxis),
       renderYAxis(ast.yAxis),
       ...ast.series.map(renderSeries),
     ]),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

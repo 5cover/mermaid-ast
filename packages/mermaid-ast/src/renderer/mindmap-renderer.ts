@@ -7,6 +7,7 @@
 import type { MindmapAST, MindmapNode, MindmapNodeShape } from '../types/mindmap.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
+import { type Doc, indent, render } from './doc.js';
 
 /**
  * Render options for mindmaps
@@ -61,43 +62,25 @@ function getShapeEnd(shape: MindmapNodeShape): string {
 }
 
 /**
- * Render a single node and its children
+ * Render a node and its children. The node's own lines are indented by its level, and
+ * children are siblings of the node's lines, so each line keeps the level its AST node has.
  */
-function renderNode(node: MindmapNode, indent: string, lines: string[]): void {
-  const prefix = indent.repeat(node.level);
-  const start = getShapeStart(node.shape);
-  const end = getShapeEnd(node.shape);
+function renderNode(node: MindmapNode): Doc {
+  const nodeLine =
+    node.shape === 'default'
+      ? node.id
+      : `${node.id}${getShapeStart(node.shape)}${node.description}${getShapeEnd(node.shape)}`;
 
-  // Build the node line
-  let line = prefix;
+  const own: Doc[] = [nodeLine];
+  if (node.icon) own.push(`::icon(${node.icon})`);
+  if (node.cssClass) own.push(`:::${node.cssClass}`);
 
-  if (node.shape === 'default') {
-    // No brackets for default shape
-    line += node.id;
-  } else if (node.id === node.description) {
-    // ID same as description, use short form
-    line += `${node.id}${start}${node.description}${end}`;
-  } else {
-    // ID different from description
-    line += `${node.id}${start}${node.description}${end}`;
+  let nested: Doc = own;
+  for (let level = 0; level < node.level; level++) {
+    nested = indent(nested);
   }
 
-  lines.push(line);
-
-  // Add icon if present
-  if (node.icon) {
-    lines.push(`${prefix}::icon(${node.icon})`);
-  }
-
-  // Add class if present
-  if (node.cssClass) {
-    lines.push(`${prefix}:::${node.cssClass}`);
-  }
-
-  // Render children
-  for (const child of node.children) {
-    renderNode(child, indent, lines);
-  }
+  return [nested, node.children.map(renderNode)];
 }
 
 /**
@@ -105,16 +88,8 @@ function renderNode(node: MindmapNode, indent: string, lines: string[]): void {
  */
 export function renderMindmap(ast: MindmapAST, options?: RenderOptions): string {
   const opts = resolveOptions(options);
-  const indent = opts.indent;
-  const lines: string[] = [];
-
-  // Header
-  lines.push('mindmap');
-
-  // Render root and all children
-  if (ast.root) {
-    renderNode(ast.root, indent, lines);
-  }
-
-  return lines.join('\n');
+  return render(['mindmap', ast.root ? renderNode(ast.root) : null], {
+    indent: opts.indent,
+    whitespace: opts.whitespace,
+  });
 }

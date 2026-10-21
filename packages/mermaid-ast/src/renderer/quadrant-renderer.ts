@@ -7,86 +7,95 @@
 import type { QuadrantAST } from '../types/quadrant.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
+import { type Doc, indent, type LinePart, line, render, softSpace, space } from './doc.js';
+
+/**
+ * Style list separated by commas. Each style is trimmed by the grammar, so the space after
+ * a comma is optional.
+ */
+function styleParts(styles: string[]): LinePart[] {
+  return styles.flatMap((style, i) => (i === 0 ? [style] : [',', softSpace, style]));
+}
 
 /**
  * Render a Quadrant Chart AST to Mermaid syntax
  */
 export function renderQuadrant(ast: QuadrantAST, options?: RenderOptions): string {
   const opts = resolveOptions(options);
-  const indent = opts.indent;
-  const lines: string[] = [];
+  const body: Doc[] = [];
 
-  // Header
-  lines.push('quadrantChart');
-
-  // Title
   if (ast.title) {
-    lines.push(`${indent}title ${ast.title}`);
+    body.push(line('title', space, ast.title));
   }
 
-  // Accessibility info
   if (ast.accTitle) {
-    lines.push(`${indent}accTitle: ${ast.accTitle}`);
+    body.push(line('accTitle:', softSpace, ast.accTitle));
   }
   if (ast.accDescription) {
-    lines.push(`${indent}accDescr: ${ast.accDescription}`);
+    body.push(line('accDescr:', softSpace, ast.accDescription));
   }
 
-  // Class definitions
   if (ast.classes && ast.classes.size > 0) {
     for (const cls of ast.classes.values()) {
-      const stylesStr = cls.styles.join(', ');
-      lines.push(`${indent}classDef ${cls.name} ${stylesStr}`);
+      body.push(line('classDef', space, cls.name, space, ...styleParts(cls.styles)));
     }
   }
 
-  // X-axis labels
   if (ast.xAxisLeft || ast.xAxisRight) {
-    const left = ast.xAxisLeft || '';
-    const right = ast.xAxisRight || '';
-    lines.push(`${indent}x-axis "${left}" --> "${right}"`);
+    body.push(
+      line(
+        'x-axis',
+        softSpace,
+        `"${ast.xAxisLeft || ''}"`,
+        softSpace,
+        '-->',
+        softSpace,
+        `"${ast.xAxisRight || ''}"`
+      )
+    );
   }
 
-  // Y-axis labels
   if (ast.yAxisBottom || ast.yAxisTop) {
-    const bottom = ast.yAxisBottom || '';
-    const top = ast.yAxisTop || '';
-    lines.push(`${indent}y-axis "${bottom}" --> "${top}"`);
+    body.push(
+      line(
+        'y-axis',
+        softSpace,
+        `"${ast.yAxisBottom || ''}"`,
+        softSpace,
+        '-->',
+        softSpace,
+        `"${ast.yAxisTop || ''}"`
+      )
+    );
   }
 
-  // Quadrant labels
   if (ast.quadrant1) {
-    lines.push(`${indent}quadrant-1 "${ast.quadrant1}"`);
+    body.push(line('quadrant-1', softSpace, `"${ast.quadrant1}"`));
   }
   if (ast.quadrant2) {
-    lines.push(`${indent}quadrant-2 "${ast.quadrant2}"`);
+    body.push(line('quadrant-2', softSpace, `"${ast.quadrant2}"`));
   }
   if (ast.quadrant3) {
-    lines.push(`${indent}quadrant-3 "${ast.quadrant3}"`);
+    body.push(line('quadrant-3', softSpace, `"${ast.quadrant3}"`));
   }
   if (ast.quadrant4) {
-    lines.push(`${indent}quadrant-4 "${ast.quadrant4}"`);
+    body.push(line('quadrant-4', softSpace, `"${ast.quadrant4}"`));
   }
 
-  // Data points
   for (const point of ast.points) {
-    let line = `${indent}${point.name}`;
-
-    // Add class reference if present
+    const parts: LinePart[] = [point.name];
     if (point.className) {
-      line += `:::${point.className}`;
+      parts.push(`:::${point.className}`);
     }
-
-    // Add coordinates
-    line += `: [${point.x}, ${point.y}]`;
-
-    // Add inline styles if present
+    parts.push(':', softSpace, `[${point.x},`, softSpace, `${point.y}]`);
     if (point.styles && point.styles.length > 0) {
-      line += ` style ${point.styles.join(', ')}`;
+      parts.push(softSpace, 'style', space, ...styleParts(point.styles));
     }
-
-    lines.push(line);
+    body.push(line(...parts));
   }
 
-  return lines.join('\n');
+  return render(['quadrantChart', indent(body)], {
+    indent: opts.indent,
+    whitespace: opts.whitespace,
+  });
 }

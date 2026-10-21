@@ -8,7 +8,7 @@ import type { PieAST } from '../types/pie.js';
 import type { RenderOptions } from '../types/render-options.js';
 import { resolveOptions } from '../types/render-options.js';
 import type { Doc } from './doc.js';
-import { render, when, blank } from './doc.js';
+import { line, render, when, blank, softSpace } from './doc.js';
 
 /**
  * Renders a PieAST to Mermaid syntax
@@ -21,15 +21,17 @@ export function renderPie(ast: PieAST, options?: RenderOptions): string {
     ast.showData ? 'pie showData' : 'pie',
 
     // Accessibility
-    when(ast.accTitle, () => `accTitle: ${ast.accTitle}`),
-    when(ast.accDescr, () => `accDescr: ${ast.accDescr}`),
+    when(ast.accTitle, () => line('accTitle:', softSpace, String(ast.accTitle))),
+    when(ast.accDescr, () => line('accDescr:', softSpace, String(ast.accDescr))),
 
     // Title
     when(ast.title, () => `title ${ast.title}`),
 
     // Sections
-    ...ast.sections.map((section) => `"${section.label}" : ${section.value}`),
+    ...ast.sections.map((section) =>
+      line(`"${section.label}"`, softSpace, ':', softSpace, `${section.value}`)
+    ),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }
