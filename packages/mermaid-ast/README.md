@@ -656,7 +656,6 @@ flowchart LR
 
 ### Planned
 
-- **Gantt task data that cannot be rebuilt.** Parsed tasks are compacted only when their fields read back as the same tokens in the same order. Tasks with extra tokens, repeated statuses, or fields out of order keep their original text in compact output, so `whitespace: "compact"` does not shorten them. They are always preserved. Shortening them would need a token model that follows Mermaid's positional rules (`compileData` in `ganttDb.js`).
 
 ### Deferred
 

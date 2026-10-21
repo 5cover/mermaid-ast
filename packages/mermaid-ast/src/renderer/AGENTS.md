@@ -51,7 +51,7 @@ Indentation is independent of whitespace: `indent` is the nesting level times th
 | class | `line()` | Relations, `: label`, ` {`, annotations, tooltips | keyword spaces, classDef name and direction required; labels cannot contain `:` |
 | state | `line()` | `-->`, `:`, annotations, composite `{` | note colon kept (parser drops two characters) |
 | er | `line()` | Role `:`, accTitle/accDescr, entity/spec boundaries where names would merge | keywords and attribute parts required |
-| gantt | `line()` | Task `:`, `,` between data, accTitle/accDescr | keyword arguments and click/href spacing required; parsed task data is rebuilt only when its tokens read back unchanged, otherwise `rawData` text is kept |
+| gantt | `line()` | Task `:`, `,` between data, accTitle/accDescr | keyword arguments and click/href spacing required; parsed task data keeps its tokens in order; compact drops only the spaces around commas |
 | journey | `line()` | Task `:` and actor `,` | `title`, `section` required |
 | mindmap | `line()` | none (no optional separators) | indentation is the tree |
 | timeline | `line()` | none (event `:` and keywords required) | section names cannot contain `:` |

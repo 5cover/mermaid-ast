@@ -4,9 +4,8 @@
  * Compact output must parse to the same AST as pretty output, and the official
  * mermaid package must accept the compact text wherever it accepts the pretty text.
  *
- * Tasks parsed from text keep their raw data (rawData). Compact output rebuilds it in the
- * compact task form only when the fields read back as the same tokens in the same order;
- * otherwise it keeps the raw text. Tasks built through the API have no rawData.
+ * Tasks parsed from text keep their raw data (rawData). Compact output keeps its tokens in
+ * order and drops only the spaces around the commas. Tasks built through the API have no rawData.
  */
 
 import { describe, expect, it } from 'bun:test';
@@ -100,28 +99,21 @@ describe('Gantt compact whitespace', () => {
       );
     });
 
-    it('keeps the raw text of parsed tasks whose tokens would change', () => {
-      // A second status overwrites the first when fields are read, so the raw text stays
-      const repeated = `gantt
-    Code :done, crit, cod1, 5d`;
-      expect(render(parse(repeated), { whitespace: 'compact' })).toBe(
-        'gantt\n    Code:done, crit, cod1, 5d'
-      );
-
-      // Fields are rebuilt in status, id, start, end order, so a reordered task keeps its text
-      const reordered = `gantt
-    Code :cod1, done, 5d`;
-      expect(render(parse(reordered), { whitespace: 'compact' })).toBe(
-        'gantt\n    Code:cod1, done, 5d'
-      );
-    });
-
-    it('keeps extra tokens of parsed tasks as written', () => {
-      const text = `gantt
-    Code :cod1, 2024-01-01, 5d, extra`;
-      expect(render(parse(text), { whitespace: 'compact' })).toBe(
-        'gantt\n    Code:cod1, 2024-01-01, 5d, extra'
-      );
+    it('keeps every token of parsed tasks in order, including repeated, reordered and extra ones', () => {
+      const cases: [string, string][] = [
+        ['Code :done, crit, cod1, 5d', 'Code:done,crit,cod1,5d'],
+        ['Code :cod1, done, 5d', 'Code:cod1,done,5d'],
+        ['Code :cod1, 2024-01-01, 5d, extra', 'Code:cod1,2024-01-01,5d,extra'],
+        [
+          'Design   :  done , des1 ,  2024-01-01 ,  2024-01-10',
+          'Design:done,des1,2024-01-01,2024-01-10',
+        ],
+      ];
+      for (const [input, expected] of cases) {
+        expect(render(parse(`gantt\n    ${input}`), { whitespace: 'compact' })).toBe(
+          `gantt\n    ${expected}`
+        );
+      }
     });
   });
 

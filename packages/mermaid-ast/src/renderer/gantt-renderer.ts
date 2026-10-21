@@ -38,19 +38,16 @@ function rawTokens(rawData: string): string[] {
  * Render a task to Mermaid syntax
  */
 function renderTask(task: GanttTask, whitespace: WhitespaceMode): Doc {
-  const fields = taskFields(task);
-
-  // Raw text is kept for round-trip fidelity. Compact output may rebuild it from the fields
-  // only when they read back as the same tokens in the same order, so nothing is lost
+  // Parsed text keeps its tokens as written. Compact output only drops the spaces around the
+  // commas, which the parser trims anyway, so every token keeps its meaning
   if (task.rawData) {
-    const tokens = rawTokens(task.rawData);
-    const sameTokens =
-      tokens.length === fields.length && tokens.every((token, i) => token === fields[i]);
-    if (whitespace === 'pretty' || !sameTokens) {
+    if (whitespace === 'pretty') {
       return line(task.name, task.rawData);
     }
+    return line(task.name, `:${rawTokens(task.rawData).join(',')}`);
   }
 
+  const fields = taskFields(task);
   if (fields.length === 0) {
     return line(task.name);
   }
