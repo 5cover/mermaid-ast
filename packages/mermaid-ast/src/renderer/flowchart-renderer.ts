@@ -218,12 +218,17 @@ function renderClicks(ast: FlowchartAST): Doc {
 /**
  * Render link styles to Doc
  */
-function renderLinkStyles(ast: FlowchartAST): Doc {
+function renderLinkStyles(ast: FlowchartAST, emittedLinks: number[]): Doc {
+  // linkStyle indices refer to positions in ast.links, but links are emitted in a different order
+  const emittedPosition = new Map(emittedLinks.map((astIndex, position) => [astIndex, position]));
   return ast.linkStyles.map((linkStyle) => {
     const styles = Object.entries(linkStyle.styles)
       .map(([key, value]) => `${key}:${value}`)
       .join(',');
-    const index = linkStyle.index === 'default' ? 'default' : linkStyle.index;
+    const index =
+      linkStyle.index === 'default'
+        ? 'default'
+        : (emittedPosition.get(linkStyle.index) ?? linkStyle.index);
     const interpolate = linkStyle.interpolate ? ` interpolate ${linkStyle.interpolate}` : '';
     return `linkStyle ${index} ${styles}${interpolate}`;
   });
@@ -548,19 +553,25 @@ export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOpti
     nodeEntries.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
+  // Subgraphs
+  const subgraphDocs = ast.subgraphs.map((subgraph) =>
+    renderSubgraph(subgraph, ast, renderedNodes, renderedLinks, opts)
+  );
+
+  // Nodes and links (compact or non-compact mode)
+  const linkDocs = links.chains
+    ? renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts)
+    : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
+
+  // Set iteration follows insertion order, so this is the order links were emitted in
+  const emittedLinks = [...renderedLinks];
+
   // Build the document
   const doc: Doc = [
     `flowchart ${ast.direction}`,
     indent([
-      // Subgraphs
-      ...ast.subgraphs.map((subgraph) =>
-        renderSubgraph(subgraph, ast, renderedNodes, renderedLinks, opts)
-      ),
-
-      // Nodes and links (compact or non-compact mode)
-      links.chains
-        ? renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts)
-        : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts),
+      subgraphDocs,
+      linkDocs,
 
       // Class definitions
       renderClassDefs(ast),
@@ -572,7 +583,7 @@ export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOpti
       renderClicks(ast),
 
       // Link styles
-      renderLinkStyles(ast),
+      renderLinkStyles(ast, emittedLinks),
     ]),
   ];
 
