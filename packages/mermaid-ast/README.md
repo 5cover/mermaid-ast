@@ -462,12 +462,19 @@ renderFlowchart(ast, { inlineClasses: true });
 // Flowchart-specific: chain links (A --> B --> C on one line)
 renderFlowchart(ast, { compactLinks: true });
 
+// Flowchart-specific: pack links that share a connector (A & B --> C & D)
+renderFlowchart(ast, { compactLinks: { cross: true } });
+
+// Compact whitespace (A-->B instead of A --> B); indentation is unchanged
+renderFlowchart(ast, { whitespace: "compact" });
+
 // Combine options
 renderFlowchart(ast, {
   indent: 2,
   sortNodes: true,
   inlineClasses: true,
-  compactLinks: true,
+  compactLinks: { chains: true, cross: true },
+  whitespace: "compact",
 });
 ```
 
@@ -476,9 +483,22 @@ renderFlowchart(ast, {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `indent` | `number \| "tab"` | `4` | Number of spaces for indentation, or `"tab"` for tabs |
+| `whitespace` | `"pretty" \| "compact"` | `"pretty"` | Whether optional spaces are written (`A --> B` or `A-->B`). Independent of `indent` |
 | `sortNodes` | `boolean` | `false` | Sort node/actor/class declarations alphabetically |
 | `inlineClasses` | `boolean` | `false` | (Flowchart only) Use `A:::className` instead of separate `class` statements |
-| `compactLinks` | `boolean` | `false` | (Flowchart only) Chain consecutive links: `A --> B --> C` |
+| `compactLinks` | `boolean \| { chains?, cross? }` | `false` | (Flowchart only) Link compression. `true` and `{ chains: true }` join consecutive links (`A --> B --> C`). `{ cross: true }` packs links that share a connector (`A & B --> C & D`). Enabled options may reorder edges. Labels, ids and styles are kept |
+
+The boolean form `compactLinks: true` on the general `RenderOptions` type is deprecated. Use `FlowchartRenderOptions` (the flowchart renderer accepts both).
+
+#### Identifier compression
+
+`Flowchart.compress()` (or `compressFlowchart(ast)`) renames node and subgraph ids to the shortest safe identifiers, in place. Labels stay the same: a node whose label was its id gets that id as an explicit label. The operation is idempotent and runs only when it reduces the output size. Edge ids, class names and classDef names are not renamed.
+
+```typescript
+const flowchart = Flowchart.parse("flowchart TD\n validateInput --> processData");
+flowchart.compress();
+flowchart.render({ whitespace: "compact" }); // flowchart TD\n    a[validateInput]-->b[processData]
+```
 
 ## Sankey Diagrams
 
