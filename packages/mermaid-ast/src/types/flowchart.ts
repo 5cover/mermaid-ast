@@ -42,7 +42,8 @@ export type FlowchartNodeShape =
 export type FlowchartLinkStroke =
   | 'normal' // ---
   | 'thick' // ===
-  | 'dotted'; // -.-
+  | 'dotted' // -.-
+  | 'invisible'; // ~~~ (only valid with arrow_open)
 
 /**
  * Link/edge arrow types
@@ -51,7 +52,10 @@ export type FlowchartLinkType =
   | 'arrow_point' // -->
   | 'arrow_circle' // --o
   | 'arrow_cross' // --x
-  | 'arrow_open'; // ---
+  | 'arrow_open' // ---
+  | 'double_arrow_point' // <-->
+  | 'double_arrow_circle' // o--o
+  | 'double_arrow_cross'; // x--x
 
 /**
  * Text content with type information

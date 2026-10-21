@@ -21,27 +21,101 @@ import {
 // @ts-expect-error - Generated JS file without types
 import flowchartParser from '../vendored/parsers/flowchart.js';
 
+/** Maximum link length, as in official Mermaid */
+const MAX_LINK_LENGTH = 10;
+
 /**
- * Destructure a link string to extract type, stroke, and length
+ * Destructure a link into type, stroke, and length, following official Mermaid
+ * (flowDb.ts destructStartLink / destructEndLink / destructLink).
  *
- * The length field represents the "extra" dashes beyond the minimum.
- * This is designed for IDEMPOTENCE: render(parse(x)) must produce
- * output that, when parsed and rendered again, is identical.
- *
- * Formula (for normal/thick strokes):
- * - Arrows with endpoints (-->, ==>, --x, --o):
- *   - Parser: length = dashCount - 1
- *   - Renderer: dashes = length + 1
- * - Open arrows (---, ===):
- *   - Parser: length = dashCount - 2
- *   - Renderer: dashes = length + 2
- *
- * Examples:
- * - "-->" has 2 dashes → length = 1 → renders as 2 dashes → "-->"
- * - "--->" has 3 dashes → length = 2 → renders as 3 dashes → "--->"
- * - "---" has 3 dashes → length = 1 → renders as 3 dashes → "---"
- * - "----" has 4 dashes → length = 2 → renders as 4 dashes → "----"
+ * The length is the "extra" dashes beyond the minimum, so that
+ * render(parse(x)) is stable:
+ * - Arrows with an endpoint (-->, ==>, --x, <-->): length = dashCount - 1
+ * - Open links (---, ===): length = dashCount - 2
+ * - Dotted links (-.->, -..->): length = number of dots
  */
+function destructEndLink(linkStr: string): {
+  type: FlowchartLinkType;
+  stroke: FlowchartLinkStroke;
+  length: number;
+} {
+  const str = linkStr.trim();
+  let line = str.slice(0, -1);
+  let type: FlowchartLinkType = 'arrow_open';
+
+  switch (str.slice(-1)) {
+    case 'x':
+      type = 'arrow_cross';
+      if (str.startsWith('x')) {
+        type = 'double_arrow_cross';
+        line = line.slice(1);
+      }
+      break;
+    case '>':
+      type = 'arrow_point';
+      if (str.startsWith('<')) {
+        type = 'double_arrow_point';
+        line = line.slice(1);
+      }
+      break;
+    case 'o':
+      type = 'arrow_circle';
+      if (str.startsWith('o')) {
+        type = 'double_arrow_circle';
+        line = line.slice(1);
+      }
+      break;
+  }
+
+  let stroke: FlowchartLinkStroke = 'normal';
+  let length = line.length - 1;
+
+  if (line.startsWith('=')) {
+    stroke = 'thick';
+  }
+  if (line.startsWith('~')) {
+    stroke = 'invisible';
+  }
+
+  const dots = line.split('.').length - 1;
+  if (dots > 0) {
+    stroke = 'dotted';
+    length = dots;
+  }
+
+  return { type, stroke, length };
+}
+
+function destructStartLink(startStr: string): {
+  type: FlowchartLinkType;
+  stroke: FlowchartLinkStroke;
+} {
+  const str = startStr.trim();
+  let type: FlowchartLinkType = 'arrow_open';
+
+  switch (str[0]) {
+    case '<':
+      type = 'arrow_point';
+      break;
+    case 'x':
+      type = 'arrow_cross';
+      break;
+    case 'o':
+      type = 'arrow_circle';
+      break;
+  }
+
+  let stroke: FlowchartLinkStroke = 'normal';
+  if (str.includes('=')) {
+    stroke = 'thick';
+  }
+  if (str.includes('.')) {
+    stroke = 'dotted';
+  }
+
+  return { type, stroke };
+}
+
 function destructLink(
   linkStr: string,
   startStr?: string
@@ -50,46 +124,26 @@ function destructLink(
   stroke: FlowchartLinkStroke;
   length: number;
 } {
-  let type: FlowchartLinkType = 'arrow_open';
-  let stroke: FlowchartLinkStroke = 'normal';
-  let length = 1;
+  const end = destructEndLink(linkStr);
+  const length = Math.min(end.length, MAX_LINK_LENGTH);
 
-  // Determine stroke type based on characters
-  if (linkStr.includes('=')) {
-    stroke = 'thick';
-  } else if (linkStr.includes('.')) {
-    stroke = 'dotted';
+  if (!startStr) {
+    return { type: end.type, stroke: end.stroke, length };
   }
 
-  // Determine arrow type based on end characters
-  const combined = (startStr || '') + linkStr;
-  if (combined.includes('x')) {
-    type = 'arrow_cross';
-  } else if (combined.includes('o')) {
-    type = 'arrow_circle';
-  } else if (combined.includes('>')) {
-    type = 'arrow_point';
-  } else {
-    type = 'arrow_open';
+  const start = destructStartLink(startStr);
+  if (start.stroke !== end.stroke) {
+    throw new Error(`Invalid flowchart link: "${startStr.trim()}${linkStr.trim()}"`);
   }
 
-  // Count length for IDEMPOTENCE
-  // The formula depends on whether it's an open arrow or has an endpoint
-  // - Open arrows: renderer uses length + 2, so parser uses dashCount - 2
-  // - Arrows with endpoints: renderer uses length + 1, so parser uses dashCount - 1
-  const dashMatch = linkStr.match(/[-=]+/g);
-  if (dashMatch) {
-    const dashCount = dashMatch[0].length;
-    if (type === 'arrow_open') {
-      // Open arrows: renderer uses length + 2
-      length = Math.max(1, dashCount - 2);
-    } else {
-      // Arrows with endpoints: renderer uses length + 1
-      length = Math.max(1, dashCount - 1);
-    }
+  if (start.type === 'arrow_open') {
+    return { type: end.type, stroke: end.stroke, length };
+  }
+  if (start.type !== end.type) {
+    throw new Error(`Invalid flowchart link: "${startStr.trim()}${linkStr.trim()}"`);
   }
 
-  return { type, stroke, length };
+  return { type: `double_${start.type}` as FlowchartLinkType, stroke: end.stroke, length };
 }
 
 /**
@@ -252,6 +306,13 @@ function createFlowchartYY(ast: FlowchartAST) {
       const sources = Array.isArray(from) ? from : [from];
       const targets = Array.isArray(to) ? to : [to];
 
+      // The lexer keeps the trailing "@" of an edge id; official Mermaid strips it,
+      // gives it only to the last source x first target edge of a group, and ignores
+      // an id that is already used by another edge.
+      const candidateId = linkInfo.id ? linkInfo.id.slice(0, -1) : undefined;
+      const edgeId =
+        candidateId && !ast.links.some((l) => l.id === candidateId) ? candidateId : undefined;
+
       for (const source of sources) {
         for (const target of targets) {
           const link: FlowchartLink = {
@@ -262,8 +323,8 @@ function createFlowchartYY(ast: FlowchartAST) {
             length: linkInfo.length || 1,
           };
 
-          if (linkInfo.id) {
-            link.id = linkInfo.id;
+          if (edgeId && source === sources[sources.length - 1] && target === targets[0]) {
+            link.id = edgeId;
           }
 
           if (linkInfo.text) {

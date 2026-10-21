@@ -7,6 +7,7 @@
 import type {
   FlowchartAST,
   FlowchartLink,
+  FlowchartLinkType,
   FlowchartNode,
   FlowchartText,
   FlowchartSubgraph,
@@ -20,6 +21,24 @@ import { block, type Doc, indent, render, when } from './doc.js';
  * Characters that terminate or redirect Mermaid flowchart text lexing.
  */
 const FLOWCHART_TEXT_DELIMITER = /[()[\]{}|]/;
+
+/**
+ * Connector characters at the start (double arrows only) and end of a link
+ */
+const START_MARKER: Partial<Record<FlowchartLinkType, string>> = {
+  double_arrow_point: '<',
+  double_arrow_circle: 'o',
+  double_arrow_cross: 'x',
+};
+const END_MARKER: Record<FlowchartLinkType, string> = {
+  arrow_open: '',
+  arrow_point: '>',
+  arrow_circle: 'o',
+  arrow_cross: 'x',
+  double_arrow_point: '>',
+  double_arrow_circle: 'o',
+  double_arrow_cross: 'x',
+};
 
 /**
  * Render text for Mermaid's flowchart `text` grammar production.
@@ -100,69 +119,35 @@ function renderNodeShape(node: FlowchartNode): string {
 function renderLinkArrow(link: FlowchartLink): string {
   const isOpen = link.type === 'arrow_open';
   const length = Math.max(1, link.length);
+  const dashes = isOpen ? length + 2 : length + 1;
 
-  let arrow = '';
-
-  // Start character based on type (for bidirectional)
-  if (link.type === 'arrow_circle') {
-    arrow += 'o';
-  } else if (link.type === 'arrow_cross') {
-    arrow += 'x';
-  }
-
-  // Build the arrow based on stroke type
+  let body: string;
   switch (link.stroke) {
+    case 'normal':
+      body = '-'.repeat(dashes);
+      break;
     case 'thick':
-      if (isOpen) {
-        arrow += '='.repeat(length + 2);
-      } else {
-        arrow += '='.repeat(length + 1);
-      }
+      body = '='.repeat(dashes);
       break;
     case 'dotted':
-      if (isOpen) {
-        arrow += '-.-';
-      } else {
-        arrow += '-.-';
-      }
+      body = `-${'.'.repeat(length)}-`;
       break;
-    case 'normal':
-      if (isOpen) {
-        arrow += '-'.repeat(length + 2);
-      } else {
-        arrow += '-'.repeat(length + 1);
-      }
+    case 'invisible':
+      body = '~'.repeat(dashes);
       break;
     default:
-      assertNever(link.stroke);
+      return assertNever(link.stroke);
   }
 
-  // End character based on type
-  switch (link.type) {
-    case 'arrow_open':
-      // No ending character for open arrows
-      break;
-    case 'arrow_point':
-      arrow += '>';
-      break;
-    case 'arrow_circle':
-      arrow += 'o';
-      break;
-    case 'arrow_cross':
-      arrow += 'x';
-      break;
-    default:
-      assertNever(link.type);
-  }
-
-  return arrow;
+  return `${START_MARKER[link.type] ?? ''}${body}${END_MARKER[link.type]}`;
 }
 
 /**
  * Render a single link to string
  */
 function renderLink(link: FlowchartLink): string {
-  const arrow = renderLinkArrow(link);
+  const idPart = link.id ? `${link.id}@` : '';
+  const arrow = `${idPart}${renderLinkArrow(link)}`;
 
   if (link.text?.text) {
     return `${arrow}|${renderText(link.text, '')}|`;

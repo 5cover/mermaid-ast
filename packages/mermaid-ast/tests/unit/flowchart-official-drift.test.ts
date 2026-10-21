@@ -1,10 +1,10 @@
 /**
- * Drift from official Mermaid (mermaid npm package) for flowchart connectors.
+ * Flowchart connector parity with official Mermaid (mermaid npm package).
  *
- * The official package is the reference. Cases marked KNOWN DRIFT document
- * current behavior of this library that differs from it; they are fixed in the
- * connector-model work unit, at which point these assertions must be flipped
- * to expect the official values.
+ * The official package is the reference. Each case parses the same text with
+ * this library and with official Mermaid and compares the edges, and the
+ * rendered output is re-parsed by official Mermaid to confirm it keeps the
+ * same meaning.
  */
 
 import { describe, expect, it } from 'bun:test';
@@ -12,93 +12,123 @@ import { parseFlowchart } from '../../src/parser/index.js';
 import { renderFlowchart } from '../../src/renderer/index.js';
 import { parseOfficialFlowchart } from '../helpers/official-flowchart.js';
 
-function edgeSummary(e: { type: string; stroke: string; length: number }): string {
-  return `${e.type}/${e.stroke}/${e.length}`;
+function ourEdges(src: string): string[] {
+  return parseFlowchart(src)
+    .links.map((l) => `${l.source}>${l.target}:${l.type}/${l.stroke}/${l.length}/${l.id ?? ''}`)
+    .sort();
 }
 
-describe('flowchart connectors agree with official Mermaid', () => {
-  const agreeing = [
-    'A --> B',
-    'A ---> B',
-    'A ==> B',
-    'A ===> B',
-    'A -.-> B',
-    'A --- B',
-    'A --o B',
-    'A --x B',
-    'A -->|text| B',
-    'A & B --> C & D',
-    'A-->oB',
-  ];
+// Official Mermaid gives every edge an auto id (L_<start>_<end>_<n>); only user ids are compared
+async function officialEdges(src: string): Promise<string[]> {
+  const official = await parseOfficialFlowchart(src);
+  return official.edges
+    .map((e) => {
+      const userId = e.id && !e.id.startsWith(`L_${e.start}_${e.end}_`) ? e.id : '';
+      return `${e.start}>${e.end}:${e.type}/${e.stroke}/${e.length}/${userId}`;
+    })
+    .sort();
+}
 
-  for (const line of agreeing) {
+function renderedBody(src: string): string {
+  return renderFlowchart(parseFlowchart(src))
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trim())
+    .join('\n');
+}
+
+const connectors = [
+  'A --> B',
+  'A ---> B',
+  'A ==> B',
+  'A ===> B',
+  'A -.-> B',
+  'A -..-> B',
+  'A -...-> B',
+  'A --- B',
+  'A ==== B',
+  'A ~~~ B',
+  'A ~~~~ B',
+  'A --o B',
+  'A --x B',
+  'A o--o B',
+  'A x--x B',
+  'A <--> B',
+  'A <==> B',
+  'A <-.-> B',
+  'A o--> B',
+  'A x---x B',
+  'A -->|text| B',
+  'A ==>|text| B',
+  'A <-->|text| B',
+  'A -- text --> B',
+  'A -- text ---o B',
+  'A -. text .-> B',
+  'A == text ==> B',
+  'A e1@--> B',
+  'A e1@-->|t| B',
+  'A & B --> C & D',
+  'A --> oB',
+];
+
+describe('flowchart connectors agree with official Mermaid', () => {
+  for (const line of connectors) {
     it(`parses ${JSON.stringify(line)} like official Mermaid`, async () => {
       const src = `flowchart TD\n ${line}`;
-      const official = await parseOfficialFlowchart(src);
-      const ours = parseFlowchart(src);
-      const ourEdges = ours.links.map(
-        (l) => `${l.source}>${l.target}:${l.type}/${l.stroke}/${l.length}`
-      );
-      const officialEdges = official.edges.map(
-        (e) => `${e.start}>${e.end}:${e.type}/${e.stroke}/${e.length}`
-      );
-      expect([...ourEdges].sort()).toEqual([...officialEdges].sort());
+      expect(ourEdges(src)).toEqual(await officialEdges(src));
+    });
+  }
+
+  for (const line of connectors) {
+    it(`renders ${JSON.stringify(line)} so official Mermaid reads the same edges`, async () => {
+      const src = `flowchart TD\n ${line}`;
+      const rendered = `flowchart TD\n${renderedBody(src)}`;
+      expect(await officialEdges(rendered)).toEqual(await officialEdges(src));
     });
   }
 });
 
-describe('KNOWN DRIFT: connector model differs from official Mermaid', () => {
-  it('official parses "A <--> B" as a double arrow; this library parses it as arrow_point', async () => {
-    const official = await parseOfficialFlowchart('flowchart TD\n A <--> B');
-    expect(official.edges[0].type).toBe('double_arrow_point');
-    const ours = parseFlowchart('flowchart TD\n A <--> B');
-    expect(ours.links[0].type).toBe('arrow_point');
+describe('connector details', () => {
+  it('dotted length is the dot count', () => {
+    expect(parseFlowchart('flowchart TD\n A -..-> B').links[0].length).toBe(2);
+    expect(renderedBody('flowchart TD\n A -..-> B')).toBe('A -..-> B');
   });
 
-  it('this library re-renders "A --o B" as the bidirectional "A o--o B" (official: arrow_circle)', async () => {
-    const official = await parseOfficialFlowchart('flowchart TD\n A --o B');
-    expect(official.edges[0].type).toBe('arrow_circle');
-    const rendered = renderFlowchart(parseFlowchart('flowchart TD\n A --o B'));
-    expect(rendered.split('\n')[1].trim()).toBe('A o--o B');
-    const reparsed = await parseOfficialFlowchart(rendered);
-    expect(reparsed.edges[0].type).toBe('double_arrow_circle');
+  it('keeps the double arrow type from "<-->" and renders the "<"', () => {
+    expect(parseFlowchart('flowchart TD\n A <--> B').links[0].type).toBe('double_arrow_point');
+    expect(renderedBody('flowchart TD\n A <--> B')).toBe('A <--> B');
   });
 
-  it('official parses "A o--o B" as a double arrow; this library parses it as arrow_circle', async () => {
-    const official = await parseOfficialFlowchart('flowchart TD\n A o--o B');
-    expect(official.edges[0].type).toBe('double_arrow_circle');
-    const ours = parseFlowchart('flowchart TD\n A o--o B');
-    expect(ours.links[0].type).toBe('arrow_circle');
+  it('renders "--o" as a single-ended circle, not the double form', () => {
+    expect(renderedBody('flowchart TD\n A --o B')).toBe('A --o B');
   });
 
-  it('this library drops the "<" of "<-->" on render', () => {
-    const rendered = renderFlowchart(parseFlowchart('flowchart TD\n A <--> B'));
-    expect(rendered.split('\n')[1].trim()).toBe('A --> B');
+  it('keeps the invisible stroke of "~~~"', () => {
+    expect(parseFlowchart('flowchart TD\n A ~~~ B').links[0].stroke).toBe('invisible');
+    expect(renderedBody('flowchart TD\n A ~~~ B')).toBe('A ~~~ B');
   });
 
-  it('official parses "A ~~~ B" as an invisible stroke; this library parses it as normal', async () => {
-    const official = await parseOfficialFlowchart('flowchart TD\n A ~~~ B');
-    expect(official.edges[0].stroke).toBe('invisible');
-    const ours = parseFlowchart('flowchart TD\n A ~~~ B');
-    expect(ours.links[0].stroke).toBe('normal');
+  it('caps the link length at 10 as official Mermaid does', () => {
+    const dashes = '-'.repeat(15);
+    expect(parseFlowchart(`flowchart TD\n A ${dashes}> B`).links[0].length).toBe(10);
   });
 
-  it('official parses dotted length from the dot count ("-..->" is length 2); this library gives 1', async () => {
-    const official = await parseOfficialFlowchart('flowchart TD\n A -..-> B');
-    expect(edgeSummary(official.edges[0])).toBe('arrow_point/dotted/2');
-    const ours = parseFlowchart('flowchart TD\n A -..-> B');
-    expect(edgeSummary(ours.links[0])).toBe('arrow_point/dotted/1');
+  it('rejects a start marker that does not match the end marker', () => {
+    expect(() => parseFlowchart('flowchart TD\n A x-- t --> B')).toThrow('Invalid flowchart link');
   });
 
-  it('official stores the edge id without "@" ("A e1@--> B" gives id "e1"); this library keeps "e1@"', async () => {
-    const official = await parseOfficialFlowchart('flowchart TD\n A e1@--> B');
-    expect(official.edges[0].id).toBe('e1');
-    const ours = parseFlowchart('flowchart TD\n A e1@--> B');
-    expect(ours.links[0].id).toBe('e1@');
+  it('gives the edge id to the last source x first target edge of a group only', () => {
+    const ast = parseFlowchart('flowchart TD\n A & B e1@--> C & D');
+    // Edge order is A>C, A>D, B>C, B>D; the id belongs to B>C (last source x first target)
+    expect(ast.links.map((l) => l.id)).toEqual([undefined, undefined, 'e1', undefined]);
   });
 
-  it('this library never emits edge ids on render (official re-reads them)', () => {
-    const rendered = renderFlowchart(parseFlowchart('flowchart TD\n A e1@--> B'));
-    expect(rendered.split('\n')[1].trim()).toBe('A --> B');
+  it('ignores a duplicate edge id', () => {
+    const ast = parseFlowchart('flowchart TD\n A e1@--> B\n C e1@--> D');
+    expect(ast.links.map((l) => l.id)).toEqual(['e1', undefined]);
+  });
+
+  it('emits the edge id on render', () => {
+    expect(renderedBody('flowchart TD\n A e1@--> B')).toBe('A e1@--> B');
   });
 });
