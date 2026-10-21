@@ -15,7 +15,7 @@ import type {
 import type { FlowchartRenderOptions, ResolvedRenderOptions } from '../types/render-options.js';
 import { normalizeLinkCompression, resolveOptions } from '../types/render-options.js';
 import { assertNever } from '../utils.js';
-import { planCrossStatements } from './flowchart-cross.js';
+import { type CrossStatement, planCrossStatements } from './flowchart-cross.js';
 import {
   block,
   type Doc,
@@ -348,39 +348,35 @@ function renderSubgraph(
 }
 
 /**
- * Build chains of links for compact rendering (A --> B --> C)
- *
- * Every link costs the same wherever it appears in a chain. A chain costs its
- * start node's id plus a line break, so the cheapest cover uses the fewest chains,
- * starting at the shortest ids. Within a weakly connected component the minimum
- * is an Eulerian decomposition: add virtual links from nodes with more incoming than
- * outgoing links to nodes with more outgoing links, take an Euler circuit, and cut
- * it at the virtual links. A balanced component is a single closed chain that starts
- * at its shortest id.
+ * Node ids in a group are joined with NUL, which cannot appear in an id
  */
-function buildLinkChains(
-  ast: FlowchartAST,
-  renderedLinks: Set<number>
-): {
-  chains: { nodeIds: string[]; links: FlowchartLink[] }[];
-  usedLinkIndices: Set<number>;
-} {
-  const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
+const GROUP_SEPARATOR = '\u0000';
 
-  const arcs = pending.map((i) => ({ from: ast.links[i].source, to: ast.links[i].target }));
-  const trails = coverTrails(arcs, (node) => node.length).map((trail) =>
-    trail.map((k) => pending[k])
-  );
+/**
+ * Key for a group of node ids. The key ignores member order.
+ */
+function groupKey(members: string[]): string {
+  return [...members].sort().join(GROUP_SEPARATOR);
+}
 
-  const chains = trails.map((trail) => ({
-    nodeIds: [ast.links[trail[0]].source, ...trail.map((i) => ast.links[i].target)],
-    links: trail.map((i) => ast.links[i]),
-  }));
+/**
+ * Rendered width of a group key: its member ids and the ` & ` between them
+ */
+function groupWidth(key: string): number {
+  const members = key.split(GROUP_SEPARATOR);
+  return members.reduce((sum, member) => sum + member.length, 0) + 3 * (members.length - 1);
+}
 
-  // In emission order, so renderedLinks records links in the order they appear in the output
-  const usedLinkIndices = new Set(trails.flat());
-
-  return { chains, usedLinkIndices };
+/**
+ * Chain cross steps into statements. Step X can be followed by step Y when X's targets
+ * are the same set of nodes as Y's sources, so the shared group is written once. A
+ * step costs the same wherever it appears, and a statement costs its start group plus
+ * a line break, so the cheapest cover uses the fewest statements, starting at the
+ * lightest groups. Singleton steps give plain chains (A --> B --> C).
+ */
+function chainSteps(steps: CrossStatement[]): CrossStatement[][] {
+  const arcs = steps.map((step) => ({ from: groupKey(step.sources), to: groupKey(step.targets) }));
+  return coverTrails(arcs, groupWidth).map((trail) => trail.map((k) => steps[k]));
 }
 
 /**
@@ -523,9 +519,6 @@ function eulerCircuit(edges: TrailEdge[], start: string): TrailEdge[] {
 }
 
 /**
- * Render compact mode content (chains like A --> B --> C)
- */
-/**
  * Node text: its full definition at first mention, otherwise the bare id
  */
 function nodeText(
@@ -564,98 +557,112 @@ function renderStandaloneNodes(
   return content;
 }
 
-function renderCompactMode(
+/**
+ * Parts for one statement: its first step's sources, then each step's connector and
+ * targets. A junction group is written once, as the previous step's targets.
+ */
+function renderStatement(
   ast: FlowchartAST,
+  opts: ResolvedRenderOptions,
+  renderedNodes: Set<string>,
+  statement: CrossStatement[]
+): LinePart[] {
+  const texts = (ids: string[]) =>
+    groupParts(ids.map((id) => nodeText(ast, opts, renderedNodes, id)));
+  const parts = texts(statement[0].sources);
+  for (const step of statement) {
+    parts.push(...linkTail(ast.links[step.indices[0]], texts(step.targets)));
+  }
+  return parts;
+}
+
+/**
+ * Render a plan: one line per statement, then the nodes no line has defined
+ */
+function renderPlan(
+  ast: FlowchartAST,
+  plan: CrossStatement[][],
   nodeEntries: [string, FlowchartNode][],
   renderedNodes: Set<string>,
   renderedLinks: Set<number>,
   opts: ResolvedRenderOptions
 ): Doc {
   const content: Doc[] = [];
-  const { chains, usedLinkIndices } = buildLinkChains(ast, renderedLinks);
-
-  for (const chain of chains) {
-    const parts: LinePart[] = [nodeText(ast, opts, renderedNodes, chain.nodeIds[0])];
-    chain.links.forEach((link, i) => {
-      parts.push(...linkTail(link, nodeText(ast, opts, renderedNodes, chain.nodeIds[i + 1])));
-    });
-    content.push(line(...parts));
+  for (const statement of plan) {
+    content.push(line(...renderStatement(ast, opts, renderedNodes, statement)));
+    // Expansion order, which is the order the parser assigns link indices in
+    for (const step of statement) {
+      for (const index of step.indices) renderedLinks.add(index);
+    }
   }
-
-  // Mark used links as rendered
-  for (const idx of usedLinkIndices) {
-    renderedLinks.add(idx);
-  }
-
   content.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
-
-  // Render remaining links
-  for (let i = 0; i < ast.links.length; i++) {
-    if (renderedLinks.has(i)) continue;
-    const link = ast.links[i];
-    content.push(line(link.source, ...linkTail(link, link.target)));
-    renderedLinks.add(i);
-  }
-
   return content;
 }
 
 /**
- * Render the links as `&` statements (cross-product packing)
+ * Candidate plans for the pending links, in tie-break order. Each plan is a list of
+ * statements. With both flags, the chain plan comes first so that ties keep it.
  */
-function renderCrossStatements(
+function candidatePlans(
   ast: FlowchartAST,
-  nodeEntries: [string, FlowchartNode][],
-  renderedNodes: Set<string>,
-  renderedLinks: Set<number>,
-  opts: ResolvedRenderOptions
-): Doc {
-  const content: Doc[] = [];
-  const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
-  const statements = planCrossStatements(ast.links, pending, (i) => renderLink(ast.links[i]));
-
-  for (const statement of statements) {
-    const link = ast.links[statement.indices[0]];
-    const sourceTexts = statement.sources.map((id) => nodeText(ast, opts, renderedNodes, id));
-    const targetTexts = statement.targets.map((id) => nodeText(ast, opts, renderedNodes, id));
-    content.push(line(...groupParts(sourceTexts), ...linkTail(link, groupParts(targetTexts))));
-    for (const index of statement.indices) renderedLinks.add(index);
+  pending: number[],
+  flags: { chains: boolean; cross: boolean }
+): CrossStatement[][][] {
+  const plans: CrossStatement[][][] = [];
+  if (flags.chains) {
+    const singles = pending.map((i) => ({
+      sources: [ast.links[i].source],
+      targets: [ast.links[i].target],
+      indices: [i],
+    }));
+    plans.push(chainSteps(singles));
   }
-
-  content.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
-  return content;
+  if (flags.cross) {
+    const steps = planCrossStatements(ast.links, pending, (i) => renderLink(ast.links[i]));
+    // Joint plan: cross steps chained at shared groups
+    if (flags.chains) plans.push(chainSteps(steps));
+    plans.push(steps.map((step) => [step]));
+  }
+  return plans;
 }
 
 /**
- * Render the links as `&` statements, and as chains too when `withChains` is set.
- * With chains, the plan with fewer bytes is used. Grouped chains are not generated.
+ * Render the pending links with the candidate plan that measures shortest. Plans are
+ * measured on copies of the render state, because rendering a node marks it defined.
  */
-function renderCrossedLinks(
+function renderLinkPlan(
   ast: FlowchartAST,
   nodeEntries: [string, FlowchartNode][],
   renderedNodes: Set<string>,
   renderedLinks: Set<number>,
   opts: ResolvedRenderOptions,
-  withChains: boolean
+  flags: { chains: boolean; cross: boolean }
 ): Doc {
-  if (withChains) {
-    const chainBytes = measure(
-      renderCompactMode(ast, nodeEntries, new Set(renderedNodes), new Set(renderedLinks), opts),
-      opts
-    );
-    const crossBytes = measure(
-      renderCrossStatements(ast, nodeEntries, new Set(renderedNodes), new Set(renderedLinks), opts),
-      opts
-    );
-    if (chainBytes <= crossBytes) {
-      return renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
+  const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
+  const plans = candidatePlans(ast, pending, flags);
+
+  let best = plans[0];
+  if (plans.length > 1) {
+    let bestBytes = Infinity;
+    for (const plan of plans) {
+      const bytes = measure(
+        renderPlan(ast, plan, nodeEntries, new Set(renderedNodes), new Set(renderedLinks), opts),
+        opts
+      );
+      if (bytes < bestBytes) {
+        best = plan;
+        bestBytes = bytes;
+      }
     }
   }
-  return renderCrossStatements(ast, nodeEntries, renderedNodes, renderedLinks, opts);
+  return renderPlan(ast, best, nodeEntries, renderedNodes, renderedLinks, opts);
 }
 
+/**
+ * Output size of content at the real indentation, since every line adds indentation
+ */
 function measure(content: Doc, opts: ResolvedRenderOptions): number {
-  return render(content, { indent: '', whitespace: opts.whitespace }).length;
+  return render(indent(content), { indent: opts.indent, whitespace: opts.whitespace }).length;
 }
 
 /**
@@ -782,10 +789,9 @@ export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOpti
   );
 
   // Nodes and links (compact or non-compact mode)
-  const linkDocs = links.cross
-    ? renderCrossedLinks(ast, nodeEntries, renderedNodes, renderedLinks, opts, links.chains)
-    : links.chains
-      ? renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts)
+  const linkDocs =
+    links.chains || links.cross
+      ? renderLinkPlan(ast, nodeEntries, renderedNodes, renderedLinks, opts, links)
       : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
 
   // Set iteration follows insertion order, so this is the order links were emitted in
