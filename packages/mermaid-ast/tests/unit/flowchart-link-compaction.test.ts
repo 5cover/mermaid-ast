@@ -1,10 +1,9 @@
 /**
- * Characterization of the current `compactLinks` behavior.
+ * Chain planning for `compactLinks`.
  *
- * These tests pin the present output so the planner can be replaced
- * deliberately. Cases marked "non-optimal" are asserted to be worse than the
- * exhaustive chain-cover minimum from tests/helpers/chain-oracle.ts; when the
- * planner is replaced these assertions are expected to flip.
+ * The expected outputs are the minimum-byte chain covers. Each case is also
+ * compared with the exhaustive minimum from tests/helpers/chain-oracle.ts, so the
+ * planner is checked against brute force rather than only against these strings.
  */
 
 import { describe, expect, it } from 'bun:test';
@@ -31,7 +30,6 @@ const corpus: {
   src: string;
   edges: OracleEdge[];
   expected: string;
-  optimal: boolean;
 }[] = [
   {
     name: 'linear chain',
@@ -42,7 +40,6 @@ const corpus: {
       { source: 'C', target: 'D', connector: CONNECTOR },
     ],
     expected: 'flowchart TD\nA --> B --> C --> D',
-    optimal: true,
   },
   {
     name: 'cycle',
@@ -53,7 +50,6 @@ const corpus: {
       { source: 'C', target: 'A', connector: CONNECTOR },
     ],
     expected: 'flowchart TD\nA --> B --> C --> A',
-    optimal: true,
   },
   {
     name: 'disconnected components',
@@ -63,7 +59,6 @@ const corpus: {
       { source: 'C', target: 'D', connector: CONNECTOR },
     ],
     expected: 'flowchart TD\nA --> B\nC --> D',
-    optimal: true,
   },
   {
     name: 'mixed connectors and labels',
@@ -74,52 +69,47 @@ const corpus: {
       { source: 'C', target: 'D', connector: '==>' },
     ],
     expected: 'flowchart TD\nA -->|x| B --- C ==> D',
-    optimal: true,
   },
   {
-    name: 'branch (non-optimal)',
+    name: 'branch',
     src: 'flowchart TD\n A-->B\n B-->C\n B-->D',
     edges: [
       { source: 'A', target: 'B', connector: CONNECTOR },
       { source: 'B', target: 'C', connector: CONNECTOR },
       { source: 'B', target: 'D', connector: CONNECTOR },
     ],
-    expected: 'flowchart TD\nA --> B\nC\nD\nB --> C\nB --> D',
-    optimal: false,
+    expected: 'flowchart TD\nA --> B --> D\nB --> C',
   },
   {
-    name: 'join (non-optimal)',
+    name: 'join',
     src: 'flowchart TD\n A-->C\n B-->C\n C-->D',
     edges: [
       { source: 'A', target: 'C', connector: CONNECTOR },
       { source: 'B', target: 'C', connector: CONNECTOR },
       { source: 'C', target: 'D', connector: CONNECTOR },
     ],
-    expected: 'flowchart TD\nA --> C\nB --> C\nC --> D',
-    optimal: false,
+    expected: 'flowchart TD\nA --> C --> D\nB --> C',
   },
   {
-    name: 'mid-path start (non-optimal)',
+    name: 'links listed mid-path first',
     src: 'flowchart TD\n B-->C\n A-->B',
     edges: [
       { source: 'B', target: 'C', connector: CONNECTOR },
       { source: 'A', target: 'B', connector: CONNECTOR },
     ],
-    expected: 'flowchart TD\nB --> C\nA --> B',
-    optimal: false,
+    expected: 'flowchart TD\nA --> B --> C',
   },
   {
-    name: 'parallel edge instances (non-optimal)',
+    name: 'parallel edge instances',
     src: 'flowchart TD\n A-->B\n A-->B',
     edges: [
       { source: 'A', target: 'B', connector: CONNECTOR },
       { source: 'A', target: 'B', connector: CONNECTOR },
     ],
-    expected: 'flowchart TD\nA\nB\nA --> B\nA --> B',
-    optimal: false,
+    expected: 'flowchart TD\nA --> B\nA --> B',
   },
   {
-    name: 'greedy continuation worse than optimal (non-optimal)',
+    name: 'greedy continuation would be worse',
     src: 'flowchart TD\n A-->B\n B-->C\n C-->D\n B-->E\n E-->F\n F-->C',
     edges: [
       { source: 'A', target: 'B', connector: CONNECTOR },
@@ -129,27 +119,43 @@ const corpus: {
       { source: 'E', target: 'F', connector: CONNECTOR },
       { source: 'F', target: 'C', connector: CONNECTOR },
     ],
-    expected: 'flowchart TD\nA --> B\nC --> D\nE --> F --> C\nB --> C\nB --> E',
-    optimal: false,
+    expected: 'flowchart TD\nA --> B --> C --> D\nB --> E --> F --> C',
   },
 ];
 
-describe('compactLinks characterization', () => {
+describe('compactLinks chain planning', () => {
   for (const entry of corpus) {
-    it(`${entry.name}: current exact output`, () => {
+    it(`${entry.name}: exact output`, () => {
       expect(compact(entry.src)).toBe(entry.expected);
     });
 
-    it(`${entry.name}: compared with chain-cover minimum`, () => {
-      const oracle = minChainCoverBytes(entry.edges);
-      const actual = bodyBytes(compact(entry.src));
-      if (entry.optimal) {
-        expect(actual).toBe(oracle);
-      } else {
-        expect(actual).toBeGreaterThan(oracle);
-      }
+    it(`${entry.name}: matches the chain-cover minimum`, () => {
+      expect(bodyBytes(compact(entry.src))).toBe(minChainCoverBytes(entry.edges));
     });
   }
+
+  // Seeded, so failures are reproducible
+  describe('random graphs with mixed id lengths', () => {
+    const ids = ['A', 'BB', 'C', 'DDD', 'E'];
+    let seed = 7;
+    const random = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed % n;
+    };
+
+    for (let g = 0; g < 150; g++) {
+      it(`graph ${g} matches the chain-cover minimum`, () => {
+        const count = 2 + random(6);
+        const edges: OracleEdge[] = Array.from({ length: count }, () => ({
+          source: ids[random(ids.length)],
+          target: ids[random(ids.length)],
+          connector: CONNECTOR,
+        }));
+        const src = `flowchart TD\n${edges.map((e) => ` ${e.source}-->${e.target}`).join('\n')}`;
+        expect(bodyBytes(compact(src))).toBe(minChainCoverBytes(edges));
+      });
+    }
+  });
 
   it('does not mutate the AST', () => {
     const ast = parseFlowchart(corpus[0].src);

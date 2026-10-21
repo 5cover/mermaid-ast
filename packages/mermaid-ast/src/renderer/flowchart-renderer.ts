@@ -296,6 +296,14 @@ function renderSubgraph(
 
 /**
  * Build chains of links for compact rendering (A --> B --> C)
+ *
+ * Every link costs the same wherever it appears in a chain. A chain costs its
+ * start node's id plus a line break, so the cheapest cover uses the fewest chains,
+ * starting at the shortest ids. Within a weakly connected component the minimum
+ * is an Eulerian decomposition: add virtual links from nodes with more incoming than
+ * outgoing links to nodes with more outgoing links, take an Euler circuit, and cut
+ * it at the virtual links. A balanced component is a single closed chain that starts
+ * at its shortest id.
  */
 function buildLinkChains(
   ast: FlowchartAST,
@@ -304,72 +312,148 @@ function buildLinkChains(
   chains: { nodeIds: string[]; links: FlowchartLink[] }[];
   usedLinkIndices: Set<number>;
 } {
-  const chains: { nodeIds: string[]; links: FlowchartLink[] }[] = [];
-  const usedLinkIndices = new Set<number>();
+  const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
 
-  // Build adjacency map: source -> list of (target, link, index)
-  const outgoing = new Map<string, { target: string; link: FlowchartLink; index: number }[]>();
-  for (let i = 0; i < ast.links.length; i++) {
-    if (renderedLinks.has(i)) continue;
-    const link = ast.links[i];
-    const list = outgoing.get(link.source) || [];
-    list.push({ target: link.target, link, index: i });
-    outgoing.set(link.source, list);
-  }
+  const trails = weaklyConnectedComponents(ast, pending).flatMap((component) =>
+    planTrails(ast, component)
+  );
+  trails.sort((a, b) => Math.min(...a) - Math.min(...b));
 
-  // Count incoming edges for each node
-  const incomingCount = new Map<string, number>();
-  for (let i = 0; i < ast.links.length; i++) {
-    if (renderedLinks.has(i)) continue;
-    const link = ast.links[i];
-    incomingCount.set(link.target, (incomingCount.get(link.target) || 0) + 1);
-  }
+  const chains = trails.map((trail) => ({
+    nodeIds: [ast.links[trail[0]].source, ...trail.map((i) => ast.links[i].target)],
+    links: trail.map((i) => ast.links[i]),
+  }));
 
-  // Find chain starting points
-  const visited = new Set<number>();
-
-  for (let i = 0; i < ast.links.length; i++) {
-    if (renderedLinks.has(i) || visited.has(i)) continue;
-
-    const link = ast.links[i];
-    const chain: { nodeIds: string[]; links: FlowchartLink[] } = {
-      nodeIds: [link.source],
-      links: [],
-    };
-
-    let current = link.source;
-
-    // Follow the chain
-    while (true) {
-      const edges = outgoing.get(current);
-      if (edges?.length !== 1) break;
-
-      const edge = edges[0];
-      if (visited.has(edge.index)) break;
-
-      // Check if target has exactly one incoming edge
-      const targetIncoming = incomingCount.get(edge.target) || 0;
-      if (targetIncoming !== 1) {
-        chain.nodeIds.push(edge.target);
-        chain.links.push(edge.link);
-        visited.add(edge.index);
-        usedLinkIndices.add(edge.index);
-        break;
-      }
-
-      chain.nodeIds.push(edge.target);
-      chain.links.push(edge.link);
-      visited.add(edge.index);
-      usedLinkIndices.add(edge.index);
-      current = edge.target;
-    }
-
-    if (chain.links.length > 0) {
-      chains.push(chain);
-    }
-  }
+  // In emission order, so renderedLinks records links in the order they appear in the output
+  const usedLinkIndices = new Set(trails.flat());
 
   return { chains, usedLinkIndices };
+}
+
+/**
+ * Group link indices into weakly connected components, each sorted ascending
+ */
+function weaklyConnectedComponents(ast: FlowchartAST, indices: number[]): number[][] {
+  const incident = new Map<string, number[]>();
+  for (const i of indices) {
+    const { source, target } = ast.links[i];
+    for (const node of [source, target]) {
+      incident.set(node, [...(incident.get(node) ?? []), i]);
+    }
+  }
+
+  const seen = new Set<number>();
+  const components: number[][] = [];
+  for (const start of indices) {
+    if (seen.has(start)) continue;
+    seen.add(start);
+    const component: number[] = [];
+    const stack = [start];
+    while (stack.length > 0) {
+      const i = stack.pop() as number;
+      component.push(i);
+      const { source, target } = ast.links[i];
+      for (const node of [source, target]) {
+        for (const j of incident.get(node) ?? []) {
+          if (!seen.has(j)) {
+            seen.add(j);
+            stack.push(j);
+          }
+        }
+      }
+    }
+    components.push(component.sort((a, b) => a - b));
+  }
+  return components;
+}
+
+interface TrailEdge {
+  from: string;
+  to: string;
+  // Link index, or undefined for a virtual edge added to balance the graph
+  link: number | undefined;
+}
+
+/**
+ * Cover one connected component with the fewest chains, each starting at the
+ * shortest possible id. Returns trails as link indices in chain order.
+ */
+function planTrails(ast: FlowchartAST, indices: number[]): number[][] {
+  // Net outgoing minus incoming links per node, in first-appearance order
+  const balance = new Map<string, number>();
+  for (const i of indices) {
+    const { source, target } = ast.links[i];
+    balance.set(source, (balance.get(source) ?? 0) + 1);
+    balance.set(target, (balance.get(target) ?? 0) - 1);
+  }
+
+  const edges: TrailEdge[] = indices.map((i) => ({
+    from: ast.links[i].source,
+    to: ast.links[i].target,
+    link: i,
+  }));
+
+  const chainStarts: string[] = [];
+  const chainEnds: string[] = [];
+  for (const [node, net] of balance) {
+    for (let k = 0; k < net; k++) chainStarts.push(node);
+    for (let k = 0; k < -net; k++) chainEnds.push(node);
+  }
+  chainEnds.forEach((end, k) => {
+    edges.push({ from: end, to: chainStarts[k], link: undefined });
+  });
+
+  if (chainStarts.length === 0) {
+    let start = [...balance.keys()][0];
+    for (const node of balance.keys()) {
+      if (node.length < start.length) start = node;
+    }
+    return [eulerCircuit(edges, start).map((edge) => edge.link as number)];
+  }
+
+  const circuit = eulerCircuit(edges, edges[0].from);
+  const firstVirtual = circuit.findIndex((edge) => edge.link === undefined);
+  const rotated = [...circuit.slice(firstVirtual + 1), ...circuit.slice(0, firstVirtual + 1)];
+
+  const trails: number[][] = [];
+  let current: number[] = [];
+  for (const edge of rotated) {
+    if (edge.link === undefined) {
+      if (current.length > 0) trails.push(current);
+      current = [];
+    } else {
+      current.push(edge.link);
+    }
+  }
+  return trails;
+}
+
+/**
+ * Hierholzer's algorithm: an Euler circuit of a balanced, connected edge set,
+ * starting at `start`
+ */
+function eulerCircuit(edges: TrailEdge[], start: string): TrailEdge[] {
+  const outgoing = new Map<string, number[]>();
+  edges.forEach((edge, k) => {
+    outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), k]);
+  });
+
+  const cursor = new Map<string, number>();
+  const stack: { node: string; edge: number | undefined }[] = [{ node: start, edge: undefined }];
+  const circuit: number[] = [];
+  while (stack.length > 0) {
+    const top = stack[stack.length - 1];
+    const options = outgoing.get(top.node) ?? [];
+    const next = cursor.get(top.node) ?? 0;
+    if (next < options.length) {
+      cursor.set(top.node, next + 1);
+      stack.push({ node: edges[options[next]].to, edge: options[next] });
+    } else {
+      stack.pop();
+      if (top.edge !== undefined) circuit.push(top.edge);
+    }
+  }
+  return circuit.reverse().map((k) => edges[k]);
 }
 
 /**
