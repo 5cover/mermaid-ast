@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Flowchart cross-product packing** - `compactLinks: { cross: true }` writes links that share a connector as `&` statements (`A & B --> C & D`). Edge labels, ids and styles are kept, and linkStyle indices follow the emitted order. Edge order can change. `chains` and `cross` together choose the shorter of the two plans; grouped chains are not generated yet.
+- **Identifier compression** - `Flowchart.compress()` and `compressFlowchart()` rename node and subgraph ids to the shortest safe identifiers, keeping labels. Idempotent. Edge ids, class names and classDef names are not renamed.
 - **Compact whitespace** - `render(ast, { whitespace: 'compact' })` omits optional spaces, for example `A-->B`. Pretty output is the default and is unchanged. Indentation is independent of this option. Implemented for flowcharts so far.
 
 ### Changed

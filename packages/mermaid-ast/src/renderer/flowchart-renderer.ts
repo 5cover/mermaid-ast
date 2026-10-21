@@ -15,6 +15,7 @@ import type {
 import type { FlowchartRenderOptions, ResolvedRenderOptions } from '../types/render-options.js';
 import { normalizeLinkCompression, resolveOptions } from '../types/render-options.js';
 import { assertNever } from '../utils.js';
+import { planCrossStatements } from './flowchart-cross.js';
 import {
   block,
   type Doc,
@@ -204,8 +205,9 @@ function linkSeparatorAfter(): Separator {
 /**
  * Parts that follow a source on an edge line: the connector, then the target text
  */
-function linkTail(link: FlowchartLink, target: string): LinePart[] {
-  return [linkSeparatorBefore(link), renderLink(link), linkSeparatorAfter(), target];
+function linkTail(link: FlowchartLink, target: string | LinePart[]): LinePart[] {
+  const targetParts = typeof target === 'string' ? [target] : target;
+  return [linkSeparatorBefore(link), renderLink(link), linkSeparatorAfter(), ...targetParts];
 }
 
 /**
@@ -510,6 +512,45 @@ function eulerCircuit(edges: TrailEdge[], start: string): TrailEdge[] {
 /**
  * Render compact mode content (chains like A --> B --> C)
  */
+/**
+ * Node text: its full definition at first mention, otherwise the bare id
+ */
+function nodeText(
+  ast: FlowchartAST,
+  opts: ResolvedRenderOptions,
+  renderedNodes: Set<string>,
+  nodeId: string
+): string {
+  const node = ast.nodes.get(nodeId);
+  if (node && !renderedNodes.has(nodeId)) {
+    const shape = renderNodeShape(node);
+    const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
+    renderedNodes.add(nodeId);
+    return `${nodeId}${shape}${classSuffix}`;
+  }
+  return nodeId;
+}
+
+/**
+ * Lines for nodes that no link line has rendered yet
+ */
+function renderStandaloneNodes(
+  ast: FlowchartAST,
+  nodeEntries: [string, FlowchartNode][],
+  renderedNodes: Set<string>,
+  opts: ResolvedRenderOptions
+): Doc[] {
+  const content: Doc[] = [];
+  for (const [nodeId, node] of nodeEntries) {
+    if (renderedNodes.has(nodeId)) continue;
+    const shape = renderNodeShape(node);
+    const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
+    content.push(`${node.id}${shape}${classSuffix}`);
+    renderedNodes.add(nodeId);
+  }
+  return content;
+}
+
 function renderCompactMode(
   ast: FlowchartAST,
   nodeEntries: [string, FlowchartNode][],
@@ -520,23 +561,10 @@ function renderCompactMode(
   const content: Doc[] = [];
   const { chains, usedLinkIndices } = buildLinkChains(ast, renderedLinks);
 
-  // Render chains
-  // Node text: its full definition at first mention, otherwise the bare id
-  const nodeText = (nodeId: string): string => {
-    const node = ast.nodes.get(nodeId);
-    if (node && !renderedNodes.has(nodeId)) {
-      const shape = renderNodeShape(node);
-      const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
-      renderedNodes.add(nodeId);
-      return `${nodeId}${shape}${classSuffix}`;
-    }
-    return nodeId;
-  };
-
   for (const chain of chains) {
-    const parts: LinePart[] = [nodeText(chain.nodeIds[0])];
+    const parts: LinePart[] = [nodeText(ast, opts, renderedNodes, chain.nodeIds[0])];
     chain.links.forEach((link, i) => {
-      parts.push(...linkTail(link, nodeText(chain.nodeIds[i + 1])));
+      parts.push(...linkTail(link, nodeText(ast, opts, renderedNodes, chain.nodeIds[i + 1])));
     });
     content.push(line(...parts));
   }
@@ -546,14 +574,7 @@ function renderCompactMode(
     renderedLinks.add(idx);
   }
 
-  // Render remaining standalone nodes
-  for (const [nodeId, node] of nodeEntries) {
-    if (renderedNodes.has(nodeId)) continue;
-    const shape = renderNodeShape(node);
-    const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
-    content.push(`${node.id}${shape}${classSuffix}`);
-    renderedNodes.add(nodeId);
-  }
+  content.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
 
   // Render remaining links
   for (let i = 0; i < ast.links.length; i++) {
@@ -564,6 +585,71 @@ function renderCompactMode(
   }
 
   return content;
+}
+
+/**
+ * Render the links as `&` statements (cross-product packing)
+ */
+function renderCrossStatements(
+  ast: FlowchartAST,
+  nodeEntries: [string, FlowchartNode][],
+  renderedNodes: Set<string>,
+  renderedLinks: Set<number>,
+  opts: ResolvedRenderOptions
+): Doc {
+  const content: Doc[] = [];
+  const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
+  const statements = planCrossStatements(ast.links, pending, (i) => renderLink(ast.links[i]));
+
+  for (const statement of statements) {
+    const link = ast.links[statement.indices[0]];
+    const sourceTexts = statement.sources.map((id) => nodeText(ast, opts, renderedNodes, id));
+    const targetTexts = statement.targets.map((id) => nodeText(ast, opts, renderedNodes, id));
+    content.push(line(...groupParts(sourceTexts), ...linkTail(link, groupParts(targetTexts))));
+    for (const index of statement.indices) renderedLinks.add(index);
+  }
+
+  content.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
+  return content;
+}
+
+/**
+ * Render the links as `&` statements, and as chains too when `withChains` is set.
+ * With chains, the plan with fewer bytes is used. Grouped chains are not generated.
+ */
+function renderCrossedLinks(
+  ast: FlowchartAST,
+  nodeEntries: [string, FlowchartNode][],
+  renderedNodes: Set<string>,
+  renderedLinks: Set<number>,
+  opts: ResolvedRenderOptions,
+  withChains: boolean
+): Doc {
+  if (withChains) {
+    const chainBytes = measure(
+      renderCompactMode(ast, nodeEntries, new Set(renderedNodes), new Set(renderedLinks), opts),
+      opts
+    );
+    const crossBytes = measure(
+      renderCrossStatements(ast, nodeEntries, new Set(renderedNodes), new Set(renderedLinks), opts),
+      opts
+    );
+    if (chainBytes <= crossBytes) {
+      return renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
+    }
+  }
+  return renderCrossStatements(ast, nodeEntries, renderedNodes, renderedLinks, opts);
+}
+
+function measure(content: Doc, opts: ResolvedRenderOptions): number {
+  return render(content, { indent: '', whitespace: opts.whitespace }).length;
+}
+
+/**
+ * Parts for a group of node texts: `A & B & C`
+ */
+function groupParts(texts: string[]): LinePart[] {
+  return texts.flatMap((text, i) => (i === 0 ? [text] : [space, '&', space, text]));
 }
 
 /**
@@ -683,9 +769,11 @@ export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOpti
   );
 
   // Nodes and links (compact or non-compact mode)
-  const linkDocs = links.chains
-    ? renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts)
-    : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
+  const linkDocs = links.cross
+    ? renderCrossedLinks(ast, nodeEntries, renderedNodes, renderedLinks, opts, links.chains)
+    : links.chains
+      ? renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts)
+      : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
 
   // Set iteration follows insertion order, so this is the order links were emitted in
   const emittedLinks = [...renderedLinks];
