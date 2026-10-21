@@ -57,6 +57,12 @@ export { ErDiagram } from './er-diagram.js';
 // Export Flowchart wrapper class
 export { Flowchart } from './flowchart.js';
 export type {
+  CompressionReport,
+  FlowchartCompressOptions,
+  IdentifierCompressionOptions,
+} from './flowchart-compress.js';
+export { compressFlowchart } from './flowchart-compress.js';
+export type {
   AddLinkOptions,
   AddNodeOptions,
   FindNodesQuery,

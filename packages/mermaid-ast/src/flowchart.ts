@@ -25,6 +25,7 @@
  */
 
 import { DiagramWrapper } from './diagram-wrapper.js';
+import { type FlowchartCompressOptions, compressFlowchart } from './flowchart-compress.js';
 import type {
   AddLinkOptions,
   AddNodeOptions,
@@ -114,6 +115,15 @@ export class Flowchart extends DiagramWrapper<FlowchartAST> {
    */
   render(options?: FlowchartRenderOptions): string {
     return renderFlowchart(this.ast, options);
+  }
+
+  /**
+   * Shorten node and subgraph ids in place. Labels are kept.
+   * See {@link compressFlowchart}.
+   */
+  compress(options?: FlowchartCompressOptions): this {
+    compressFlowchart(this.ast, options);
+    return this;
   }
 
   /**
