@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Compact whitespace** - `render(ast, { whitespace: 'compact' })` omits optional spaces, for example `A-->B`. Pretty output is the default and is unchanged. Indentation is independent of this option. Implemented for flowcharts so far.
+
 ### Changed
 - **Flowchart compactLinks chain planning** - `compactLinks: true` now produces the fewest and shortest chains. The previous greedy planner could start chains mid-path, split branches and joins, and emit node-only lines. Output is still chain-only and never longer. Edge order may change; labels, ids and styles are preserved.
 - **Flowchart connector types** - Added `double_arrow_point`, `double_arrow_circle`, `double_arrow_cross` link types and the `invisible` stroke, matching official Mermaid. `A <--> B` is now parsed as `double_arrow_point` (previously `arrow_point`).

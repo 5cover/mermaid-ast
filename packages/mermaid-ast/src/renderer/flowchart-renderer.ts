@@ -15,7 +15,18 @@ import type {
 import type { FlowchartRenderOptions, ResolvedRenderOptions } from '../types/render-options.js';
 import { normalizeLinkCompression, resolveOptions } from '../types/render-options.js';
 import { assertNever } from '../utils.js';
-import { block, type Doc, indent, render, when } from './doc.js';
+import {
+  block,
+  type Doc,
+  indent,
+  type LinePart,
+  line,
+  render,
+  type Separator,
+  space,
+  spaceWhen,
+  when,
+} from './doc.js';
 
 /**
  * Characters that terminate or redirect Mermaid flowchart text lexing.
@@ -156,6 +167,47 @@ function renderLink(link: FlowchartLink): string {
   return arrow;
 }
 
+const startsWithMarker = (s: string) => s.startsWith('o') || s.startsWith('x');
+const endsWithMarker = (s: string) => s.endsWith('o') || s.endsWith('x');
+const endsWithOpenStroke = (s: string) => {
+  const last = s[s.length - 1];
+  return last === '-' || last === '=' || last === '.';
+};
+
+/**
+ * Separator between a source and a connector. Compact output keeps a space only where
+ * the text would lex differently: a connector starting with "o" or "x" would merge into
+ * the source id, a source that is a lone "o" or "x" would read as a connector marker,
+ * and a source ending in a stroke character would extend the connector.
+ * An edge id is always followed by a space.
+ */
+function linkSeparatorBefore(link: FlowchartLink): Separator {
+  if (link.id) return space;
+  return spaceWhen(
+    (source, connector) =>
+      startsWithMarker(connector) || source === 'o' || source === 'x' || endsWithOpenStroke(source)
+  );
+}
+
+/**
+ * Separator between a connector and its target. Compact output keeps a space after a
+ * connector ending in "o" or "x" (it would merge with the target id), and before a target
+ * starting with "o" or "x" when the connector is open (it would read as the arrow end).
+ */
+function linkSeparatorAfter(): Separator {
+  return spaceWhen(
+    (connector, target) =>
+      endsWithMarker(connector) || (startsWithMarker(target) && endsWithOpenStroke(connector))
+  );
+}
+
+/**
+ * Parts that follow a source on an edge line: the connector, then the target text
+ */
+function linkTail(link: FlowchartLink, target: string): LinePart[] {
+  return [linkSeparatorBefore(link), renderLink(link), linkSeparatorAfter(), target];
+}
+
 /**
  * Get inline class suffix for a node (:::className)
  */
@@ -285,8 +337,7 @@ function renderSubgraph(
       subgraph.nodes.includes(link.source) &&
       subgraph.nodes.includes(link.target)
     ) {
-      const linkStr = renderLink(link);
-      bodyContent.push(`${link.source} ${linkStr} ${link.target}`);
+      bodyContent.push(line(link.source, ...linkTail(link, link.target)));
       renderedLinks.add(i);
     }
   }
@@ -470,40 +521,24 @@ function renderCompactMode(
   const { chains, usedLinkIndices } = buildLinkChains(ast, renderedLinks);
 
   // Render chains
-  for (const chain of chains) {
-    let line = '';
-    for (let i = 0; i < chain.nodeIds.length; i++) {
-      const nodeId = chain.nodeIds[i];
-      const node = ast.nodes.get(nodeId);
-
-      if (i === 0) {
-        if (node && !renderedNodes.has(nodeId)) {
-          const shape = renderNodeShape(node);
-          const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
-          line += `${nodeId}${shape}${classSuffix}`;
-          renderedNodes.add(nodeId);
-        } else {
-          line += nodeId;
-        }
-      }
-
-      if (i < chain.links.length) {
-        const link = chain.links[i];
-        const linkStr = renderLink(link);
-        const targetId = chain.nodeIds[i + 1];
-        const targetNode = ast.nodes.get(targetId);
-
-        if (targetNode && !renderedNodes.has(targetId)) {
-          const targetShape = renderNodeShape(targetNode);
-          const classSuffix = opts.inlineClasses ? getInlineClassSuffix(targetId, ast) : '';
-          line += ` ${linkStr} ${targetId}${targetShape}${classSuffix}`;
-          renderedNodes.add(targetId);
-        } else {
-          line += ` ${linkStr} ${targetId}`;
-        }
-      }
+  // Node text: its full definition at first mention, otherwise the bare id
+  const nodeText = (nodeId: string): string => {
+    const node = ast.nodes.get(nodeId);
+    if (node && !renderedNodes.has(nodeId)) {
+      const shape = renderNodeShape(node);
+      const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
+      renderedNodes.add(nodeId);
+      return `${nodeId}${shape}${classSuffix}`;
     }
-    content.push(line);
+    return nodeId;
+  };
+
+  for (const chain of chains) {
+    const parts: LinePart[] = [nodeText(chain.nodeIds[0])];
+    chain.links.forEach((link, i) => {
+      parts.push(...linkTail(link, nodeText(chain.nodeIds[i + 1])));
+    });
+    content.push(line(...parts));
   }
 
   // Mark used links as rendered
@@ -524,8 +559,7 @@ function renderCompactMode(
   for (let i = 0; i < ast.links.length; i++) {
     if (renderedLinks.has(i)) continue;
     const link = ast.links[i];
-    const linkStr = renderLink(link);
-    content.push(`${link.source} ${linkStr} ${link.target}`);
+    content.push(line(link.source, ...linkTail(link, link.target)));
     renderedLinks.add(i);
   }
 
@@ -570,7 +604,6 @@ function renderNonCompactMode(
       // Node with links - render the first link with node definition
       const firstLinkInfo = linksFromThis[0];
       const shape = renderNodeShape(node);
-      const linkStr = renderLink(firstLinkInfo.link);
       const targetNode = ast.nodes.get(firstLinkInfo.link.target);
       const targetClassSuffix = opts.inlineClasses
         ? getInlineClassSuffix(firstLinkInfo.link.target, ast)
@@ -581,7 +614,13 @@ function renderNonCompactMode(
           : '';
 
       content.push(
-        `${node.id}${shape}${classSuffix} ${linkStr} ${firstLinkInfo.link.target}${targetShape}${targetClassSuffix}`
+        line(
+          `${node.id}${shape}${classSuffix}`,
+          ...linkTail(
+            firstLinkInfo.link,
+            `${firstLinkInfo.link.target}${targetShape}${targetClassSuffix}`
+          )
+        )
       );
       renderedNodes.add(nodeId);
       renderedNodes.add(firstLinkInfo.link.target);
@@ -590,7 +629,6 @@ function renderNonCompactMode(
       // Render additional links from this node
       for (let i = 1; i < linksFromThis.length; i++) {
         const linkInfo = linksFromThis[i];
-        const linkStr = renderLink(linkInfo.link);
         const targetNode = ast.nodes.get(linkInfo.link.target);
         const targetClassSuffix = opts.inlineClasses
           ? getInlineClassSuffix(linkInfo.link.target, ast)
@@ -599,7 +637,10 @@ function renderNonCompactMode(
           targetNode && !renderedNodes.has(linkInfo.link.target) ? renderNodeShape(targetNode) : '';
 
         content.push(
-          `${node.id} ${linkStr} ${linkInfo.link.target}${targetShape}${targetClassSuffix}`
+          line(
+            node.id,
+            ...linkTail(linkInfo.link, `${linkInfo.link.target}${targetShape}${targetClassSuffix}`)
+          )
         );
         renderedNodes.add(linkInfo.link.target);
         renderedLinks.add(linkInfo.index);
@@ -611,8 +652,7 @@ function renderNonCompactMode(
   for (let i = 0; i < ast.links.length; i++) {
     if (renderedLinks.has(i)) continue;
     const link = ast.links[i];
-    const linkStr = renderLink(link);
-    content.push(`${link.source} ${linkStr} ${link.target}`);
+    content.push(line(link.source, ...linkTail(link, link.target)));
     renderedLinks.add(i);
   }
 
@@ -671,5 +711,5 @@ export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOpti
     ]),
   ];
 
-  return render(doc, opts.indent);
+  return render(doc, { indent: opts.indent, whitespace: opts.whitespace });
 }

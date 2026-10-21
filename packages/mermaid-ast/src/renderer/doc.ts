@@ -82,7 +82,58 @@
  * ];
  * ```
  */
-export type Doc = string | Doc[] | { _indent: Doc } | { _blank: true } | null | undefined | false;
+export type Doc =
+  | string
+  | Doc[]
+  | { _indent: Doc }
+  | { _blank: true }
+  | { _line: LinePart[] }
+  | null
+  | undefined
+  | false;
+
+/**
+ * A separator between two text parts of one line (see {@link line}).
+ *
+ * - `required`: always a space. Use where the grammar needs one, such as after a keyword.
+ * - `optional`: a space in pretty output. Dropped in compact output, unless `needed`
+ *   returns true for the text on either side.
+ */
+export type Separator =
+  | { _sep: 'required' }
+  | { _sep: 'optional'; needed?: (left: string, right: string) => boolean };
+
+/** Mandatory space */
+export const space: Separator = { _sep: 'required' };
+
+/** Space in pretty output, dropped in compact output */
+export const softSpace: Separator = { _sep: 'optional' };
+
+/** Space in pretty output; in compact output only where `needed` is true for the adjacent text */
+export const spaceWhen = (needed: (left: string, right: string) => boolean): Separator => ({
+  _sep: 'optional',
+  needed,
+});
+
+/** One part of a line: literal text, or a separator between text */
+export type LinePart = string | Separator;
+
+/**
+ * A single output line built from text parts and separators.
+ *
+ * Text parts are emitted verbatim, so labels and other payloads are never changed.
+ * Separators are resolved at render time from the whitespace mode, so compact output
+ * is produced by the renderer, not by rewriting the rendered string. Separators at the
+ * start or end of a line are dropped, and empty text parts are skipped.
+ *
+ * @example
+ * ```typescript
+ * const doc: Doc = line('A', softSpace, '-->', softSpace, 'B');
+ * render(doc);                                  // A --> B
+ * render(doc, { whitespace: 'compact' });       // A-->B
+ * ```
+ */
+export const line = (...parts: LinePart[]): Doc => ({ _line: parts });
 
 /**
  * An empty line marker.
@@ -309,7 +360,9 @@ export const join = (docs: Doc[], separator: Doc): Doc => {
  * // \tchild
  * ```
  */
-export function render(doc: Doc, indentStr = '    '): string {
+export function render(doc: Doc, options: string | RenderDocOptions = '    '): string {
+  const indentStr = typeof options === 'string' ? options : (options.indent ?? '    ');
+  const compact = typeof options !== 'string' && options.whitespace === 'compact';
   const lines: string[] = [];
 
   function walk(d: Doc, level: number): void {
@@ -331,11 +384,65 @@ export function render(doc: Doc, indentStr = '    '): string {
     } else if (typeof d === 'object' && '_blank' in d) {
       // Blank line marker = empty line (no indentation)
       lines.push('');
+    } else if (typeof d === 'object' && '_line' in d) {
+      const text = joinLine(d._line, compact);
+      if (text !== '') lines.push(indentStr.repeat(level) + text);
     }
   }
 
   walk(doc, 0);
   return lines.join('\n');
+}
+
+/**
+ * Options for {@link render}
+ */
+export interface RenderDocOptions {
+  /**
+   * String for each indent level
+   * @default '    '
+   */
+  indent?: string;
+  /**
+   * Whether optional separators are emitted. Does not affect indentation.
+   * @default 'pretty'
+   */
+  whitespace?: 'pretty' | 'compact';
+}
+
+/**
+ * Resolve the parts of a line to text.
+ *
+ * In pretty output every separator is a space. In compact output a separator is a
+ * space only if it is required or its `needed` predicate matches the text parts on
+ * either side.
+ */
+function joinLine(parts: LinePart[], compact: boolean): string {
+  let text = '';
+  let previous: string | undefined;
+  let pending: Separator | undefined;
+
+  for (const part of parts) {
+    if (typeof part !== 'string') {
+      // A required separator wins over an optional one at the same position
+      pending = pending?._sep === 'required' ? pending : part;
+      continue;
+    }
+    if (part === '') continue;
+
+    if (pending && text !== '') {
+      const keep =
+        !compact ||
+        pending._sep === 'required' ||
+        (previous !== undefined && (pending.needed?.(previous, part) ?? false));
+      if (keep) text += ' ';
+    }
+    pending = undefined;
+    text += part;
+    previous = part;
+  }
+
+  return text;
 }
 
 /**
