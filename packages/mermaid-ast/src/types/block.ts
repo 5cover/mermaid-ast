@@ -96,7 +96,18 @@ export interface BlockEdge {
   label?: string;
   /** Edge type */
   edgeType: BlockEdgeType;
+  /** Marker at the start of the edge (`<`, `o`, `x`); `arrow_open` when there is none */
+  startArrowType?: BlockEdgeStartArrowType;
+  /** Line thickness: `thick` for `==` connectors */
+  thickness?: 'normal' | 'thick';
+  /** Line pattern: `dotted` for `-.` connectors */
+  pattern?: 'solid' | 'dotted';
 }
+
+/**
+ * Marker at the start of a block edge
+ */
+export type BlockEdgeStartArrowType = 'arrow_open' | 'arrow_point' | 'arrow_circle' | 'arrow_cross';
 
 /**
  * Column setting statement

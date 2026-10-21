@@ -37,6 +37,8 @@ export interface TimelineSection {
  */
 export interface TimelineAST {
   type: 'timeline';
+  /** Direction from the header (`timeline LR`); absent for the default */
+  direction?: 'LR' | 'TD';
   /** Diagram title */
   title?: string;
   /** Sections (if using sections) */

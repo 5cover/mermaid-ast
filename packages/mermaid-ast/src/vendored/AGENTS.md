@@ -1,6 +1,6 @@
 # Vendored JISON Parsers
 
-Parsers vendored from mermaid.js v11.12.2 (see VERSION file).
+Parsers vendored from mermaid.js v11.17.2 (see VERSION file).
 
 ## Contents
 
@@ -23,7 +23,7 @@ block, c4, class, er, flowchart, gantt, journey, kanban, mindmap, quadrant, requ
 
 Run from repo root:
 ```bash
-just ast-sync-parsers 11.12.2   # or desired version
+just ast-sync-parsers 11.17.2   # or desired version
 ```
 
 This runs `scripts/sync-parsers.ts` which clones mermaid.js, copies .jison files, compiles them to JS, and updates VERSION.

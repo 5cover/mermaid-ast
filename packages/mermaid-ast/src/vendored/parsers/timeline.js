@@ -72,12 +72,12 @@
   }
 */
 var parser = (function(){
-var o=function(k,v,o,l){for(o=o||{},l=k.length;l--;o[k[l]]=v);return o},$V0=[6,8,10,11,12,14,16,17,20,21],$V1=[1,9],$V2=[1,10],$V3=[1,11],$V4=[1,12],$V5=[1,13],$V6=[1,16],$V7=[1,17];
+var o=function(k,v,o,l){for(o=o||{},l=k.length;l--;o[k[l]]=v);return o},$V0=[6,11,13,14,15,17,19,20,23,24],$V1=[1,12],$V2=[1,13],$V3=[1,14],$V4=[1,15],$V5=[1,16],$V6=[1,19],$V7=[1,20];
 var parser = {trace: function trace () { },
 yy: {},
-symbols_: {"error":2,"start":3,"timeline":4,"document":5,"EOF":6,"line":7,"SPACE":8,"statement":9,"NEWLINE":10,"title":11,"acc_title":12,"acc_title_value":13,"acc_descr":14,"acc_descr_value":15,"acc_descr_multiline_value":16,"section":17,"period_statement":18,"event_statement":19,"period":20,"event":21,"$accept":0,"$end":1},
-terminals_: {2:"error",4:"timeline",6:"EOF",8:"SPACE",10:"NEWLINE",11:"title",12:"acc_title",13:"acc_title_value",14:"acc_descr",15:"acc_descr_value",16:"acc_descr_multiline_value",17:"section",20:"period",21:"event"},
-productions_: [0,[3,3],[5,0],[5,2],[7,2],[7,1],[7,1],[7,1],[9,1],[9,2],[9,2],[9,1],[9,1],[9,1],[9,1],[18,1],[19,1]],
+symbols_: {"error":2,"start":3,"timeline_header":4,"document":5,"EOF":6,"timeline":7,"timeline_lr":8,"timeline_td":9,"line":10,"SPACE":11,"statement":12,"NEWLINE":13,"title":14,"acc_title":15,"acc_title_value":16,"acc_descr":17,"acc_descr_value":18,"acc_descr_multiline_value":19,"section":20,"period_statement":21,"event_statement":22,"period":23,"event":24,"$accept":0,"$end":1},
+terminals_: {2:"error",6:"EOF",7:"timeline",8:"timeline_lr",9:"timeline_td",11:"SPACE",13:"NEWLINE",14:"title",15:"acc_title",16:"acc_title_value",17:"acc_descr",18:"acc_descr_value",19:"acc_descr_multiline_value",20:"section",23:"period",24:"event"},
+productions_: [0,[3,3],[4,1],[4,1],[4,1],[5,0],[5,2],[10,2],[10,1],[10,1],[10,1],[12,1],[12,2],[12,2],[12,1],[12,1],[12,1],[12,1],[21,1],[22,1]],
 performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate /* action[1] */, $$ /* vstack */, _$ /* lstack */) {
 /* this == yyval */
 
@@ -86,39 +86,45 @@ switch (yystate) {
 case 1:
  return $$[$0-1]; 
 break;
-case 2:
+case 3:
+ yy.setDirection('LR'); 
+break;
+case 4:
+ yy.setDirection('TD'); 
+break;
+case 5:
  this.$ = [] 
 break;
-case 3:
+case 6:
 $$[$0-1].push($$[$0]);this.$ = $$[$0-1]
 break;
-case 4: case 5:
+case 7: case 8:
  this.$ = $$[$0] 
 break;
-case 6: case 7:
+case 9: case 10:
  this.$=[];
 break;
-case 8:
+case 11:
 yy.getCommonDb().setDiagramTitle($$[$0].substr(6));this.$=$$[$0].substr(6);
 break;
-case 9:
+case 12:
  this.$=$$[$0].trim();yy.getCommonDb().setAccTitle(this.$); 
 break;
-case 10: case 11:
+case 13: case 14:
  this.$=$$[$0].trim();yy.getCommonDb().setAccDescription(this.$); 
 break;
-case 12:
+case 15:
 yy.addSection($$[$0].substr(8));this.$=$$[$0].substr(8);
 break;
-case 15:
+case 18:
 yy.addTask($$[$0],0,'');this.$=$$[$0];
 break;
-case 16:
+case 19:
 yy.addEvent($$[$0].substr(2));this.$=$$[$0];
 break;
 }
 },
-table: [{3:1,4:[1,2]},{1:[3]},o($V0,[2,2],{5:3}),{6:[1,4],7:5,8:[1,6],9:7,10:[1,8],11:$V1,12:$V2,14:$V3,16:$V4,17:$V5,18:14,19:15,20:$V6,21:$V7},o($V0,[2,7],{1:[2,1]}),o($V0,[2,3]),{9:18,11:$V1,12:$V2,14:$V3,16:$V4,17:$V5,18:14,19:15,20:$V6,21:$V7},o($V0,[2,5]),o($V0,[2,6]),o($V0,[2,8]),{13:[1,19]},{15:[1,20]},o($V0,[2,11]),o($V0,[2,12]),o($V0,[2,13]),o($V0,[2,14]),o($V0,[2,15]),o($V0,[2,16]),o($V0,[2,4]),o($V0,[2,9]),o($V0,[2,10])],
+table: [{3:1,4:2,7:[1,3],8:[1,4],9:[1,5]},{1:[3]},o($V0,[2,5],{5:6}),o($V0,[2,2]),o($V0,[2,3]),o($V0,[2,4]),{6:[1,7],10:8,11:[1,9],12:10,13:[1,11],14:$V1,15:$V2,17:$V3,19:$V4,20:$V5,21:17,22:18,23:$V6,24:$V7},o($V0,[2,10],{1:[2,1]}),o($V0,[2,6]),{12:21,14:$V1,15:$V2,17:$V3,19:$V4,20:$V5,21:17,22:18,23:$V6,24:$V7},o($V0,[2,8]),o($V0,[2,9]),o($V0,[2,11]),{16:[1,22]},{18:[1,23]},o($V0,[2,14]),o($V0,[2,15]),o($V0,[2,16]),o($V0,[2,17]),o($V0,[2,18]),o($V0,[2,19]),o($V0,[2,7]),o($V0,[2,12]),o($V0,[2,13])],
 defaultActions: {},
 parseError: function parseError (str, hash) {
     if (hash.recoverable) {
@@ -602,44 +608,48 @@ case 0:/* skip comments */
 break;
 case 1:/* skip comments */
 break;
-case 2:return 10;
+case 2:return 13;
 break;
 case 3:/* skip whitespace */
 break;
 case 4:/* skip comments */
 break;
-case 5:return 4;
+case 5:return 8;
 break;
-case 6:return 11;
+case 6:return 9;
 break;
-case 7: this.begin("acc_title");return 12; 
+case 7:return 7;
 break;
-case 8: this.popState(); return "acc_title_value"; 
+case 8:return 14;
 break;
-case 9: this.begin("acc_descr");return 14; 
+case 9: this.begin("acc_title");return 15; 
 break;
-case 10: this.popState(); return "acc_descr_value"; 
+case 10: this.popState(); return "acc_title_value"; 
 break;
-case 11: this.begin("acc_descr_multiline");
+case 11: this.begin("acc_descr");return 17; 
 break;
-case 12: this.popState(); 
+case 12: this.popState(); return "acc_descr_value"; 
 break;
-case 13:return "acc_descr_multiline_value";
+case 13: this.begin("acc_descr_multiline");
 break;
-case 14:return 17;
+case 14: this.popState(); 
 break;
-case 15:return 21;
+case 15:return "acc_descr_multiline_value";
 break;
 case 16:return 20;
 break;
-case 17:return 6;
+case 17:return 24;
 break;
-case 18:return 'INVALID';
+case 18:return 23;
+break;
+case 19:return 6;
+break;
+case 20:return 'INVALID';
 break;
 }
 },
-rules: [/^(?:%(?!\{)[^\n]*)/i,/^(?:[^\}]%%[^\n]*)/i,/^(?:[\n]+)/i,/^(?:\s+)/i,/^(?:#[^\n]*)/i,/^(?:timeline\b)/i,/^(?:title\s[^\n]+)/i,/^(?:accTitle\s*:\s*)/i,/^(?:(?!\n||)*[^\n]*)/i,/^(?:accDescr\s*:\s*)/i,/^(?:(?!\n||)*[^\n]*)/i,/^(?:accDescr\s*\{\s*)/i,/^(?:[\}])/i,/^(?:[^\}]*)/i,/^(?:section\s[^:\n]+)/i,/^(?::\s(?:[^:\n]|:(?!\s))+)/i,/^(?:[^#:\n]+)/i,/^(?:$)/i,/^(?:.)/i],
-conditions: {"acc_descr_multiline":{"rules":[12,13],"inclusive":false},"acc_descr":{"rules":[10],"inclusive":false},"acc_title":{"rules":[8],"inclusive":false},"INITIAL":{"rules":[0,1,2,3,4,5,6,7,9,11,14,15,16,17,18],"inclusive":true}}
+rules: [/^(?:%(?!\{)[^\n]*)/i,/^(?:[^\}]%%[^\n]*)/i,/^(?:[\n]+)/i,/^(?:\s+)/i,/^(?:#[^\n]*)/i,/^(?:timeline[ \t]+LR\b)/i,/^(?:timeline[ \t]+TD\b)/i,/^(?:timeline\b)/i,/^(?:title\s[^\n]+)/i,/^(?:accTitle\s*:\s*)/i,/^(?:(?!\n||)*[^\n]*)/i,/^(?:accDescr\s*:\s*)/i,/^(?:(?!\n||)*[^\n]*)/i,/^(?:accDescr\s*\{\s*)/i,/^(?:[\}])/i,/^(?:[^\}]*)/i,/^(?:section\s[^:\n]+)/i,/^(?::\s(?:[^:\n]|:(?!\s))+)/i,/^(?:[^#:\n]+)/i,/^(?:$)/i,/^(?:.)/i],
+conditions: {"acc_descr_multiline":{"rules":[14,15],"inclusive":false},"acc_descr":{"rules":[12],"inclusive":false},"acc_title":{"rules":[10],"inclusive":false},"INITIAL":{"rules":[0,1,2,3,4,5,6,7,8,9,11,13,16,17,18,19,20],"inclusive":true}}
 });
 return lexer;
 })();

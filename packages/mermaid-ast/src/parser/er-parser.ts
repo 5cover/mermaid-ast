@@ -116,6 +116,11 @@ function createErYY(ast: ErDiagramAST) {
       ast.direction = direction as ErDirection;
     },
 
+    // Subgraphs have no representation in the ER AST, so they are rejected
+    addSubGraph(): void {
+      throw new Error('ER diagram subgraphs are not supported');
+    },
+
     setAccTitle(title: string): void {
       ast.accTitle = title;
     },

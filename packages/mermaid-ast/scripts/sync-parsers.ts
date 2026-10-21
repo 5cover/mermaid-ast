@@ -18,7 +18,7 @@
  * Examples:
  *   deno run --allow-all scripts/sync-parsers.ts           # Uses locked version
  *   deno run --allow-all scripts/sync-parsers.ts --latest  # Uses latest release
- *   deno run --allow-all scripts/sync-parsers.ts 11.12.2   # Uses specific version
+ *   deno run --allow-all scripts/sync-parsers.ts 11.17.2   # Uses specific version
  */
 
 /**
@@ -27,7 +27,7 @@
  * All parsers should be synced from this version for consistency.
  * Update this when upgrading to a new mermaid.js version.
  */
-const LOCKED_MERMAID_VERSION = '11.12.2';
+const LOCKED_MERMAID_VERSION = '11.17.2';
 
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

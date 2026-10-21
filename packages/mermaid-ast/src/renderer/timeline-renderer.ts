@@ -48,5 +48,6 @@ export function renderTimeline(ast: TimelineAST, options?: RenderOptions): strin
     }
   }
 
-  return render(['timeline', body], { indent: opts.indent, whitespace: opts.whitespace });
+  const header = ast.direction ? line('timeline', space, ast.direction) : 'timeline';
+  return render([header, body], { indent: opts.indent, whitespace: opts.whitespace });
 }

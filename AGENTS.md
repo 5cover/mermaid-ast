@@ -21,7 +21,7 @@ We chose to **vendor the JISON parsers** from mermaid.js because:
 
 ### Vendoring Approach
 
-The JISON grammar files (`.jison`) are downloaded from mermaid.js v11.12.2, compiled to JavaScript parsers, and stored in `src/vendored/`. A sync script (`scripts/sync-parsers.ts`) handles this process.
+The JISON grammar files (`.jison`) are downloaded from mermaid.js v11.17.2, compiled to JavaScript parsers, and stored in `src/vendored/`. A sync script (`scripts/sync-parsers.ts`) handles this process.
 
 Two diagram types (**pie** and **gitgraph**) use the Langium-based `@mermaid-js/parser` instead of JISON, and require async parsing.
 
@@ -61,7 +61,7 @@ mermaid-ast/
 │   │   │   ├── parser/       # Custom yy objects that build ASTs
 │   │   │   ├── renderer/     # AST to Mermaid syntax (uses doc.ts)
 │   │   │   ├── types/        # TypeScript AST type definitions
-│   │   │   ├── vendored/     # JISON parsers from mermaid.js v11.12.2
+│   │   │   ├── vendored/     # JISON parsers from mermaid.js v11.17.2
 │   │   │   ├── <diagram>.ts  # Wrapper classes (18 total)
 │   │   │   └── index.ts      # Barrel exports
 │   │   ├── tests/
@@ -201,7 +201,7 @@ gh run view <run_id> --log-failed
 
 ### Updating Vendored Parsers
 ```bash
-just ast-sync-parsers 11.12.2  # Specific version
+just ast-sync-parsers 11.17.2  # Specific version
 ```
 
 ### Building

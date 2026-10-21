@@ -72,12 +72,16 @@ function renderYAxis(yAxis: XYChartAST['yAxis']): Doc {
  */
 function renderSeries(series: XYChartAST['series'][0]): Doc {
   const label: LinePart[] = series.label ? [`"${series.label}"`, softSpace] : [];
+  const points = series.values.map((value, i) => {
+    const pointLabel = series.labels?.[i];
+    return pointLabel ? [`${value}`, space, `"${pointLabel}"`] : [`${value}`];
+  });
   return line(
     series.type,
     space,
     ...label,
     '[',
-    ...joinItems(series.values.map((v) => `${v}`)),
+    ...points.flatMap((point, i) => (i === 0 ? point : [',', softSpace, ...point])),
     ']'
   );
 }

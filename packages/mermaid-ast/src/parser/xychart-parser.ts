@@ -19,6 +19,29 @@ interface ParsedText {
 }
 
 /**
+ * Data point from parser: a value with an optional label ('' when absent)
+ */
+interface ParsedPoint {
+  value: number;
+  label: string;
+}
+
+/**
+ * Split data points into series values and sparse per-point labels
+ */
+function seriesData(points: ParsedPoint[]): Pick<DataSeries, 'values' | 'labels'> {
+  const values = points.map((point) => point.value);
+  if (!points.some((point) => point.label)) {
+    return { values };
+  }
+  const labels = new Array<string | undefined>(points.length);
+  points.forEach((point, i) => {
+    if (point.label) labels[i] = point.label;
+  });
+  return { values, labels };
+}
+
+/**
  * Create the yy object that the JISON parser uses to build the AST
  */
 function createXYChartYY(ast: XYChartAST) {
@@ -75,20 +98,20 @@ function createXYChartYY(ast: XYChartAST) {
       }
     },
 
-    setLineData(textObj: ParsedText, values: number[]): void {
+    setLineData(textObj: ParsedText, points: ParsedPoint[]): void {
       const series: DataSeries = {
         type: 'line',
         label: textObj.text,
-        values,
+        ...seriesData(points),
       };
       ast.series.push(series);
     },
 
-    setBarData(textObj: ParsedText, values: number[]): void {
+    setBarData(textObj: ParsedText, points: ParsedPoint[]): void {
       const series: DataSeries = {
         type: 'bar',
         label: textObj.text,
-        values,
+        ...seriesData(points),
       };
       ast.series.push(series);
     },

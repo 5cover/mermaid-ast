@@ -14,6 +14,7 @@ import {
   type BlockColumnSetting,
   type BlockComposite,
   type BlockEdge,
+  type BlockEdgeStartArrowType,
   type BlockEdgeType,
   type BlockElement,
   type BlockNode,
@@ -124,6 +125,30 @@ function edgeStrToEdgeType(edgeStr: string): BlockEdgeType {
 }
 
 /**
+ * Marker at the start of an edge string: `<` point, `o` circle, `x` cross, otherwise open
+ */
+function edgeStrToStartArrowType(edgeStr: string): BlockEdgeStartArrowType {
+  switch (edgeStr.trim().charAt(0)) {
+    case 'x':
+      return 'arrow_cross';
+    case 'o':
+      return 'arrow_circle';
+    case '<':
+      return 'arrow_point';
+    default:
+      return 'arrow_open';
+  }
+}
+
+function edgeStrToThickness(edgeStr: string): 'normal' | 'thick' {
+  return edgeStr.includes('==') ? 'thick' : 'normal';
+}
+
+function edgeStrToPattern(edgeStr: string): 'solid' | 'dotted' {
+  return edgeStr.includes('.-') ? 'dotted' : 'solid';
+}
+
+/**
  * Creates the yy object for the JISON parser
  */
 function createBlockYY(ast: BlockAST) {
@@ -155,6 +180,13 @@ function createBlockYY(ast: BlockAST) {
       // Return the edge type for arrow end
       return edgeStrToEdgeType(edgeStr);
     },
+
+    edgeStrToEdgeStartData: (edgeStr: string): BlockEdgeStartArrowType =>
+      edgeStrToStartArrowType(edgeStr),
+
+    edgeStrToThickness: (edgeStr: string): 'normal' | 'thick' => edgeStrToThickness(edgeStr),
+
+    edgeStrToPattern: (edgeStr: string): 'solid' | 'dotted' => edgeStrToPattern(edgeStr),
 
     setAccTitle: (title: string) => {
       ast.accTitle = title?.trim();
@@ -238,6 +270,9 @@ function processElements(rawElements: unknown[], ast: BlockAST): void {
         end: String(elem.end),
         label: elem.label ? String(elem.label) : undefined,
         edgeType: (elem.arrowTypeEnd as BlockEdgeType) || 'arrow',
+        startArrowType: elem.arrowTypeStart as BlockEdgeStartArrowType | undefined,
+        thickness: elem.thickness as BlockEdge['thickness'],
+        pattern: elem.pattern as BlockEdge['pattern'],
       };
       ast.elements.push(edge);
       continue;

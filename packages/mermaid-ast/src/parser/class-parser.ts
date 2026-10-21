@@ -86,6 +86,9 @@ function mapLineType(type: number | string): LineType {
  * Create the yy object that the JISON parser uses
  */
 function createClassYY(ast: ClassDiagramAST) {
+  // Namespaces are flat in the AST, so nesting cannot be represented
+  let openNamespaces = 0;
+
   // Helper to get or create a class
   function getOrCreateClass(id: string): ClassDefinition {
     let cls = ast.classes.get(id);
@@ -198,14 +201,26 @@ function createClassYY(ast: ClassDiagramAST) {
       cls.annotations.push(annotation);
     },
 
-    // Add namespace
-    addNamespace(name: string) {
+    // Add namespace. Labels and nested namespaces have no representation in the AST, so they are rejected
+    addNamespace(name: string, label?: string) {
+      if (label) {
+        throw new Error('Class namespace labels are not supported');
+      }
+      if (openNamespaces > 0) {
+        throw new Error('Nested class namespaces are not supported');
+      }
+      openNamespaces++;
       if (!ast.namespaces.has(name)) {
         ast.namespaces.set(name, { name, classes: [] });
       }
+      return name;
     },
 
-    // Add classes to namespace
+    popNamespace() {
+      openNamespaces--;
+    },
+
+    // Add classes to namespace. Notes in the body are already stored by addNote
     addClassesToNamespace(namespaceName: string, classIds: string[]) {
       let ns = ast.namespaces.get(namespaceName);
       if (!ns) {

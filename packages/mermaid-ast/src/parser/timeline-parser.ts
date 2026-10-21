@@ -58,6 +58,10 @@ function createTimelineYY(ast: TimelineAST) {
       };
     },
 
+    setDirection(direction: 'LR' | 'TD'): void {
+      ast.direction = direction;
+    },
+
     addSection(name: string): void {
       currentSection = {
         name,

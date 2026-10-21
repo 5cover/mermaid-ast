@@ -59,6 +59,11 @@ export interface DataSeries {
   type: SeriesType;
   label: string;
   values: number[];
+  /**
+   * Per-point labels, parallel to `values`: `labels[i]` labels point `i`.
+   * Sparse, so unlabeled points are holes. Absent when no point has a label.
+   */
+  labels?: (string | undefined)[];
 }
 
 /**
