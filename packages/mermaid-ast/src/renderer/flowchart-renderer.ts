@@ -12,8 +12,8 @@ import type {
   FlowchartText,
   FlowchartSubgraph,
 } from '../types/flowchart.js';
-import type { RenderOptions, ResolvedRenderOptions } from '../types/render-options.js';
-import { resolveOptions } from '../types/render-options.js';
+import type { FlowchartRenderOptions, ResolvedRenderOptions } from '../types/render-options.js';
+import { normalizeLinkCompression, resolveOptions } from '../types/render-options.js';
 import { assertNever } from '../utils.js';
 import { block, type Doc, indent, render, when } from './doc.js';
 
@@ -533,8 +533,10 @@ function renderNonCompactMode(
 /**
  * Render a FlowchartAST to Mermaid syntax
  */
-export function renderFlowchart(ast: FlowchartAST, options?: RenderOptions): string {
-  const opts = resolveOptions(options);
+export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOptions): string {
+  const { compactLinks, ...rest } = options ?? {};
+  const opts = resolveOptions(rest);
+  const links = normalizeLinkCompression(compactLinks);
 
   // Track what we've rendered
   const renderedNodes = new Set<string>();
@@ -556,7 +558,7 @@ export function renderFlowchart(ast: FlowchartAST, options?: RenderOptions): str
       ),
 
       // Nodes and links (compact or non-compact mode)
-      opts.compactLinks
+      links.chains
         ? renderCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts)
         : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts),
 

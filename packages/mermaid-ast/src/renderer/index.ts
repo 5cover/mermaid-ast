@@ -23,7 +23,12 @@ export { renderStateDiagram } from './state-diagram-renderer.js';
 export { renderTimeline } from './timeline-renderer.js';
 export { renderXYChart } from './xychart-renderer.js';
 
-import type { MermaidAST, RenderOptions } from '../types/index.js';
+import type {
+  FlowchartAST,
+  FlowchartRenderOptions,
+  MermaidAST,
+  RenderOptions,
+} from '../types/index.js';
 import {
   isBlockAST,
   isC4AST,
@@ -66,60 +71,65 @@ import { renderXYChart } from './xychart-renderer.js';
 /**
  * Render any supported Mermaid AST to diagram syntax
  */
-export function render(ast: MermaidAST, options?: RenderOptions): string {
+export function render(ast: FlowchartAST, options?: FlowchartRenderOptions): string;
+export function render(ast: MermaidAST, options?: RenderOptions): string;
+export function render(ast: MermaidAST, options?: FlowchartRenderOptions): string {
+  // Only the flowchart renderer reads the object form of compactLinks; the other
+  // renderers ignore it, so they receive the same value typed as RenderOptions.
+  const legacy = options as RenderOptions | undefined;
   if (isBlockAST(ast)) {
-    return renderBlock(ast, options);
+    return renderBlock(ast, legacy);
   }
   if (isC4AST(ast)) {
-    return renderC4(ast, options);
+    return renderC4(ast, legacy);
   }
   if (isFlowchartAST(ast)) {
-    return renderFlowchart(ast, options);
+    return renderFlowchart(ast, legacy);
   }
   if (isSequenceAST(ast)) {
-    return renderSequence(ast, options);
+    return renderSequence(ast, legacy);
   }
   if (isClassDiagramAST(ast)) {
-    return renderClassDiagram(ast, options);
+    return renderClassDiagram(ast, legacy);
   }
   if (isErDiagramAST(ast)) {
-    return renderErDiagram(ast, options);
+    return renderErDiagram(ast, legacy);
   }
   if (isSankeyAST(ast)) {
-    return renderSankey(ast, options);
+    return renderSankey(ast, legacy);
   }
   if (isPieAST(ast)) {
-    return renderPie(ast, options);
+    return renderPie(ast, legacy);
   }
   if (isGitGraphAST(ast)) {
-    return renderGitGraph(ast, options);
+    return renderGitGraph(ast, legacy);
   }
   if (isQuadrantAST(ast)) {
-    return renderQuadrant(ast, options);
+    return renderQuadrant(ast, legacy);
   }
   if (isXYChartAST(ast)) {
-    return renderXYChart(ast, options);
+    return renderXYChart(ast, legacy);
   }
   if (isKanbanAST(ast)) {
-    return renderKanban(ast, options);
+    return renderKanban(ast, legacy);
   }
   if (isRequirementAST(ast)) {
-    return renderRequirement(ast, options);
+    return renderRequirement(ast, legacy);
   }
   if (isStateDiagramAST(ast)) {
-    return renderStateDiagram(ast, options);
+    return renderStateDiagram(ast, legacy);
   }
   if (isGanttAST(ast)) {
-    return renderGantt(ast, options);
+    return renderGantt(ast, legacy);
   }
   if (isJourneyAST(ast)) {
-    return renderJourney(ast, options);
+    return renderJourney(ast, legacy);
   }
   if (isMindmapAST(ast)) {
-    return renderMindmap(ast, options);
+    return renderMindmap(ast, legacy);
   }
   if (isTimelineAST(ast)) {
-    return renderTimeline(ast, options);
+    return renderTimeline(ast, legacy);
   }
 
   throw new Error(`Unsupported AST type: ${(ast as { type: string }).type}`);

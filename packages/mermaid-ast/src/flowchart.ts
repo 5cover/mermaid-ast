@@ -45,7 +45,7 @@ import type {
   FlowchartSubgraph,
 } from './types/flowchart.js';
 import { createEmptyFlowchartAST } from './types/flowchart.js';
-import type { RenderOptions } from './types/render-options.js';
+import type { FlowchartRenderOptions } from './types/render-options.js';
 
 // Re-export types for convenience
 export type { AddLinkOptions, AddNodeOptions, FindNodesQuery, LinkInfo, RemoveNodeOptions };
@@ -112,7 +112,7 @@ export class Flowchart extends DiagramWrapper<FlowchartAST> {
    * Render to Mermaid syntax
    * @param options - Render options
    */
-  render(options?: RenderOptions): string {
+  render(options?: FlowchartRenderOptions): string {
     return renderFlowchart(this.ast, options);
   }
 
