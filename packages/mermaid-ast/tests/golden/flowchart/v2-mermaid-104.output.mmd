@@ -1,8 +1,8 @@
 flowchart TD
-    A --> B
-    A --> C
-    E --> D
-    F --> D
+    A e1@--> B
+    A e2@--> C
+    E e7@--> D
+    F e8@--> D
     e1
     e2
     e3
@@ -10,7 +10,7 @@ flowchart TD
     e5
     e6
     e7
-    B --> E
-    B --> D
-    C --> D
-    C --> F
+    B e5@--> E
+    B e3@--> D
+    C e4@--> D
+    C e6@--> F
