@@ -53,4 +53,25 @@ describe('flowchart link compression inside subgraphs', () => {
       expect(edges(reparsed)).toEqual(edges(original));
     });
   }
+
+  it('defines a node at its first mention inside a planned link', () => {
+    const src =
+      'flowchart TD\n    subgraph S\n        A[Start] --> B[Mid]\n        B --> C[End]\n    end';
+    expect(
+      Flowchart.parse(src).render({
+        compactLinks: { chains: true },
+        whitespace: 'compact',
+        indent: 0,
+      })
+    ).toBe('flowchart TD\nsubgraph S\nA[Start]-->B[Mid]-->C[End]\nend');
+  });
+
+  it('keeps nodes without links as standalone lines inside the subgraph', () => {
+    const src =
+      'flowchart TD\n    subgraph S\n        A --> B\n        D[Alone]\n    end\n    E --> A';
+    const out = Flowchart.parse(src).render({ compactLinks: { chains: true } });
+    expect(out).toContain('        D[Alone]');
+    const reparsed = Flowchart.parse(out).toAST();
+    expect(reparsed.subgraphs[0].nodes.sort()).toEqual(['A', 'B', 'D']);
+  });
 });

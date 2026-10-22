@@ -319,18 +319,10 @@ function renderSubgraph(
     bodyContent.push(`direction ${subgraph.direction}`);
   }
 
-  // Render nodes in this subgraph
-  for (const nodeId of nodeIds) {
-    if (!renderedNodes.has(nodeId)) {
-      const node = ast.nodes.get(nodeId);
-      if (node) {
-        const shape = renderNodeShape(node);
-        const classSuffix = opts.inlineClasses ? getInlineClassSuffix(nodeId, ast) : '';
-        bodyContent.push(`${node.id}${shape}${classSuffix}`);
-        renderedNodes.add(nodeId);
-      }
-    }
-  }
+  const nodeEntries = nodeIds.flatMap((id): [string, FlowchartNode][] => {
+    const node = ast.nodes.get(id);
+    return node ? [[id, node]] : [];
+  });
 
   // Links between nodes in this subgraph, planned like the top level
   const scope = ast.links
@@ -342,8 +334,11 @@ function renderSubgraph(
         subgraph.nodes.includes(ast.links[i].target)
     );
   if (links.chains || links.cross) {
+    // Nodes in planned links are defined at their first mention. The rest get standalone lines
     bodyContent.push(renderLinkPlan(ast, renderedNodes, renderedLinks, opts, links, scope));
+    bodyContent.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
   } else {
+    bodyContent.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
     for (const i of scope) {
       const link = ast.links[i];
       bodyContent.push(line(link.source, ...linkTail(link, link.target)));
