@@ -57,7 +57,7 @@ export type WhitespaceMode = 'pretty' | 'compact';
 
 /**
  * Link compression for flowcharts.
- * - `true`: chain consecutive links (same as `{ chains: true }`)
+ * - `true`: maximum compaction (same as `{ chains: true, cross: true }`)
  * - `{ chains }`: join consecutive links into chains (A --> B --> C)
  * - `{ cross }`: join links that share a connector into `&` groups (A & B --> C & D)
  * - `{ chains, cross }`: chain the `&` groups at shared groups (A & B --> C --> D & E),
@@ -135,7 +135,7 @@ export function resolveOptions(options?: RenderOptions): ResolvedRenderOptions {
 
 /**
  * Normalize flowchart link compression to explicit flags.
- * `true` keeps the legacy behavior (chains only); objects enable only what they name.
+ * `true` enables both chains and cross; objects enable only what they name.
  */
 export function normalizeLinkCompression(value: FlowchartLinkCompression | undefined): {
   chains: boolean;
@@ -145,7 +145,7 @@ export function normalizeLinkCompression(value: FlowchartLinkCompression | undef
     return { chains: false, cross: false };
   }
   if (value === true) {
-    return { chains: true, cross: false };
+    return { chains: true, cross: true };
   }
   return { chains: value.chains ?? false, cross: value.cross ?? false };
 }

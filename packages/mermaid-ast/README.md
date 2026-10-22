@@ -459,8 +459,11 @@ renderFlowchart(ast, { sortNodes: true });
 // Flowchart-specific: inline classes (A:::highlight instead of separate class statement)
 renderFlowchart(ast, { inlineClasses: true });
 
-// Flowchart-specific: chain links (A --> B --> C on one line)
+// Flowchart-specific: maximum link compaction (same as { chains: true, cross: true })
 renderFlowchart(ast, { compactLinks: true });
+
+// Flowchart-specific: chain links only (A --> B --> C on one line)
+renderFlowchart(ast, { compactLinks: { chains: true } });
 
 // Flowchart-specific: pack links that share a connector (A & B --> C & D)
 renderFlowchart(ast, { compactLinks: { cross: true } });
@@ -486,7 +489,7 @@ renderFlowchart(ast, {
 | `whitespace` | `"pretty" \| "compact"` | `"pretty"` | Whether optional spaces are written (`A --> B` or `A-->B`). Independent of `indent` |
 | `sortNodes` | `boolean` | `false` | Sort node/actor/class declarations alphabetically |
 | `inlineClasses` | `boolean` | `false` | (Flowchart only) Use `A:::className` instead of separate `class` statements |
-| `compactLinks` | `boolean \| { chains?, cross? }` | `false` | (Flowchart only) Link compression. `true` and `{ chains: true }` join consecutive links (`A --> B --> C`). `{ cross: true }` packs links that share a connector (`A & B --> C & D`). `{ chains: true, cross: true }` also chains packed groups at shared groups (`A & B --> C --> D & E`) and emits the shortest of the chain, cross and joint plans. Enabled options may reorder edges. Labels, ids and styles are kept |
+| `compactLinks` | `boolean \| { chains?, cross? }` | `false` | (Flowchart only) Link compression. `true` is maximum compaction, the same as `{ chains: true, cross: true }`. `{ chains: true }` joins consecutive links (`A --> B --> C`). `{ cross: true }` packs links that share a connector (`A & B --> C & D`). The chains-and-cross form also chains packed groups at shared groups (`A & B --> C --> D & E`) and emits the shortest of the chain, cross and joint plans. Enabled options may reorder edges. Labels, ids and styles are kept |
 
 The boolean form `compactLinks: true` on the general `RenderOptions` type is deprecated. Use `FlowchartRenderOptions` (the flowchart renderer accepts both).
 

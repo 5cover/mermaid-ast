@@ -24,7 +24,7 @@ describe('normalizeLinkCompression', () => {
     [undefined, false, false],
     [false, false, false],
     [{}, false, false],
-    [true, true, false],
+    [true, true, true],
     [{ chains: true }, true, false],
     [{ cross: true }, false, true],
     [{ chains: true, cross: true }, true, true],

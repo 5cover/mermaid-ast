@@ -9,7 +9,7 @@ import { renderFlowchart } from '../../src/renderer/index.js';
 import { parseOfficialFlowchart } from '../helpers/official-flowchart.js';
 
 const JOINT = { compactLinks: { chains: true, cross: true } } as const;
-const CHAINS = { compactLinks: true } as const;
+const CHAINS = { compactLinks: { chains: true } } as const;
 const CROSS = { compactLinks: { cross: true } } as const;
 
 function edgeList(links: FlowchartLink[]): string[] {
@@ -46,6 +46,13 @@ describe('joint plan corpus', () => {
     const src = 'flowchart TD\n A-->C\n B-->C\n C-->D\n C-->E\n D-->F\n E-->F';
     expect(renderFlowchart(parseFlowchart(src), JOINT)).toBe(
       'flowchart TD\n    A & B --> C --> D & E --> F'
+    );
+  });
+
+  it('compactLinks true is the joint plan', () => {
+    const src = 'flowchart TD\n A-->C\n B-->C\n C-->D\n C-->E';
+    expect(renderFlowchart(parseFlowchart(src), { compactLinks: true })).toBe(
+      renderFlowchart(parseFlowchart(src), JOINT)
     );
   });
 

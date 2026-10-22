@@ -24,7 +24,7 @@ function edges(ast: FlowchartAST): string[] {
 
 describe('flowchart link compression inside subgraphs', () => {
   it('chains links inside a subgraph', () => {
-    const out = Flowchart.parse(SUBGRAPH).render({ compactLinks: true });
+    const out = Flowchart.parse(SUBGRAPH).render({ compactLinks: { chains: true } });
     expect(out).toContain('        A --> B --> E');
     expect(out).toContain('        C --> B --> D');
     expect(out).not.toContain('        A --> B\n');

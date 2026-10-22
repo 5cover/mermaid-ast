@@ -14,7 +14,7 @@ import { type OracleEdge, minChainCoverBytes } from '../helpers/chain-oracle.js'
 const CONNECTOR = '-->';
 
 function compact(src: string): string {
-  return renderFlowchart(parseFlowchart(src), { compactLinks: true, indent: 0 });
+  return renderFlowchart(parseFlowchart(src), { compactLinks: { chains: true }, indent: 0 });
 }
 
 // Bytes of the body lines, counting one newline per line (the oracle's cost model).

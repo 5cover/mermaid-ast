@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Block edge details** - `BlockEdge` gains `startArrowType`, `thickness` and `pattern`. `edgeType` is unchanged.
 
 ### Changed
+- **compactLinks true is maximum compaction** - `compactLinks: true` now means `{ chains: true, cross: true }`, so it can emit `&` groups and shared-group chains, and it can reorder edges. The output is never longer than `{ chains: true }`. To keep chains only, pass `{ chains: true }`.
 - **Vendored parsers synced to Mermaid 11.17.2** - Grammars for flowchart, sequence, class, state, ER, timeline, quadrant, XYChart, block and C4 changed upstream. Quadrant labels accept non-ASCII text, C4 accepts `ComponentQueue_Ext`, and flowchart accepts `direction TD` inside subgraphs. Unsupported new syntax is rejected with an error: ER subgraphs, class namespace labels and nested namespaces. See the README roadmap for what is still unsupported.
 - **Trailing whitespace in pretty output** - Three inputs that the parser cannot produce now render without a trailing space: a timeline event with empty text, a classDef with no styles, and a mindmap node with an empty id. Valid diagrams are unchanged.
 - **Flowchart compactLinks chain planning** - `compactLinks: true` now produces the fewest and shortest chains. The previous greedy planner could start chains mid-path, split branches and joins, and emit node-only lines. Output is still chain-only and never longer. Edge order may change; labels, ids and styles are preserved.
