@@ -673,6 +673,7 @@ These are known gaps. They are not planned for the current release.
   - **Class namespace labels** (`namespace N ["Label"]`) and **nested namespaces** are rejected with an error. Notes inside a namespace body are stored as global notes, so they render outside the namespace.
   - **Sequence arrows** added in 11.15 (half arrows such as `-|\`, dotted and reverse variants, central connections `()`) and **`participant_actor`** do not parse.
   - **`swimlane-beta`** is not detected as a diagram type.
+- **HTML attributes in labels with double quotes.** `A["<font style="color:red">x</font>"]` is rejected. Official Mermaid rewrites double-quoted attributes inside `<tag ...>` to single quotes before parsing (its `cleanupText` step, which also runs for every diagram type). That rewrite is not applied here, so write the attribute with single quotes.
 - **Identifier compression** does not rename class names or edge ids.
 - **Scope-aware definition placement and inlining** are not done. Node definitions are not moved across subgraph boundaries to shorten output.
 - **Quote omission** outside flowcharts is deferred. Quotes are kept wherever a grammar may need them.
