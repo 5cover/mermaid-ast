@@ -296,7 +296,8 @@ function renderSubgraph(
   ast: FlowchartAST,
   renderedNodes: Set<string>,
   renderedLinks: Set<number>,
-  opts: ResolvedRenderOptions
+  opts: ResolvedRenderOptions,
+  links: { chains: boolean; cross: boolean }
 ): Doc {
   const title = subgraph.title?.text || subgraph.id;
   const header =
@@ -331,14 +332,20 @@ function renderSubgraph(
     }
   }
 
-  // Render links between nodes in this subgraph
-  for (let i = 0; i < ast.links.length; i++) {
-    const link = ast.links[i];
-    if (
-      !renderedLinks.has(i) &&
-      subgraph.nodes.includes(link.source) &&
-      subgraph.nodes.includes(link.target)
-    ) {
+  // Links between nodes in this subgraph, planned like the top level
+  const scope = ast.links
+    .map((_, i) => i)
+    .filter(
+      (i) =>
+        !renderedLinks.has(i) &&
+        subgraph.nodes.includes(ast.links[i].source) &&
+        subgraph.nodes.includes(ast.links[i].target)
+    );
+  if (links.chains || links.cross) {
+    bodyContent.push(renderLinkPlan(ast, renderedNodes, renderedLinks, opts, links, scope));
+  } else {
+    for (const i of scope) {
+      const link = ast.links[i];
       bodyContent.push(line(link.source, ...linkTail(link, link.target)));
       renderedLinks.add(i);
     }
@@ -577,16 +584,15 @@ function renderStatement(
 }
 
 /**
- * Render a plan: one line per statement, then the nodes no line has defined
+ * Render a plan: one line per statement
  */
 function renderPlan(
   ast: FlowchartAST,
   plan: CrossStatement[][],
-  nodeEntries: [string, FlowchartNode][],
   renderedNodes: Set<string>,
   renderedLinks: Set<number>,
   opts: ResolvedRenderOptions
-): Doc {
+): Doc[] {
   const content: Doc[] = [];
   for (const statement of plan) {
     content.push(line(...renderStatement(ast, opts, renderedNodes, statement)));
@@ -595,7 +601,6 @@ function renderPlan(
       for (const index of step.indices) renderedLinks.add(index);
     }
   }
-  content.push(...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts));
   return content;
 }
 
@@ -632,13 +637,12 @@ function candidatePlans(
  */
 function renderLinkPlan(
   ast: FlowchartAST,
-  nodeEntries: [string, FlowchartNode][],
   renderedNodes: Set<string>,
   renderedLinks: Set<number>,
   opts: ResolvedRenderOptions,
-  flags: { chains: boolean; cross: boolean }
-): Doc {
-  const pending = ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i));
+  flags: { chains: boolean; cross: boolean },
+  pending: number[]
+): Doc[] {
   const plans = candidatePlans(ast, pending, flags);
 
   let best = plans[0];
@@ -646,7 +650,7 @@ function renderLinkPlan(
     let bestBytes = Infinity;
     for (const plan of plans) {
       const bytes = measure(
-        renderPlan(ast, plan, nodeEntries, new Set(renderedNodes), new Set(renderedLinks), opts),
+        renderPlan(ast, plan, new Set(renderedNodes), new Set(renderedLinks), opts),
         opts
       );
       if (bytes < bestBytes) {
@@ -655,7 +659,7 @@ function renderLinkPlan(
       }
     }
   }
-  return renderPlan(ast, best, nodeEntries, renderedNodes, renderedLinks, opts);
+  return renderPlan(ast, best, renderedNodes, renderedLinks, opts);
 }
 
 /**
@@ -785,13 +789,23 @@ export function renderFlowchart(ast: FlowchartAST, options?: FlowchartRenderOpti
 
   // Subgraphs
   const subgraphDocs = ast.subgraphs.map((subgraph) =>
-    renderSubgraph(subgraph, ast, renderedNodes, renderedLinks, opts)
+    renderSubgraph(subgraph, ast, renderedNodes, renderedLinks, opts, links)
   );
 
   // Nodes and links (compact or non-compact mode)
   const linkDocs =
     links.chains || links.cross
-      ? renderLinkPlan(ast, nodeEntries, renderedNodes, renderedLinks, opts, links)
+      ? [
+          ...renderLinkPlan(
+            ast,
+            renderedNodes,
+            renderedLinks,
+            opts,
+            links,
+            ast.links.map((_, i) => i).filter((i) => !renderedLinks.has(i))
+          ),
+          ...renderStandaloneNodes(ast, nodeEntries, renderedNodes, opts),
+        ]
       : renderNonCompactMode(ast, nodeEntries, renderedNodes, renderedLinks, opts);
 
   // Set iteration follows insertion order, so this is the order links were emitted in

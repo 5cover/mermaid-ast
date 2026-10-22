@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Flowchart connector types** - Added `double_arrow_point`, `double_arrow_circle`, `double_arrow_cross` link types and the `invisible` stroke, matching official Mermaid. `A <--> B` is now parsed as `double_arrow_point` (previously `arrow_point`).
 
 ### Fixed
+- **Flowchart compactLinks inside subgraphs** - Links whose endpoints are both in a subgraph were written one per line before the planner ran, so `compactLinks` never chained or packed them. They are now planned with the top-level flags.
 - **Flowchart label escaping** - Quote node, edge, and subgraph labels that contain flowchart delimiter characters so rendered output remains parseable.
 - **Flowchart connector rendering** - `A --o B` renders as `A --o B` (previously the bidirectional `A o--o B`), `<-->` keeps its start marker, `~~~` keeps its invisible stroke, and dotted links keep their length (`-..->`).
 - **Flowchart edge ids** - Edge ids (`e1@-->`) are parsed without the trailing `@`, given only to the last source x first target edge of a group, and emitted on render.
