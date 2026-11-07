@@ -29,7 +29,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && cp -r src/vendored dist/",
+    "build": "tsc -p tsconfig.build.json && cp -R src/vendored dist/",
     "test": "bun test",
     "test:unit": "bun test tests/unit",
     "test:roundtrip": "bun test tests/roundtrip",
