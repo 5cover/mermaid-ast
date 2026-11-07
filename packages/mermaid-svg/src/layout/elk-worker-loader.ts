@@ -38,7 +38,7 @@ const sandbox: Record<string, unknown> = {
   window: undefined,
   global: globalThis,
 };
-sandbox.exports = sandbox.module.exports;
+sandbox.exports = (sandbox.module as { exports: unknown }).exports;
 
 // Run the script in the sandbox
 const script = new vm.Script(content);

@@ -16,8 +16,9 @@ import type { LayoutResult, PositionedEdge, PositionedNode, Theme } from '../typ
 import { FakeWorker } from './elk-worker-loader.js';
 
 // Create ELK instance with custom worker factory that uses the FakeWorker
+// FakeWorker implements only the postMessage, onmessage and terminate members elkjs calls
 const elk = new ELK({
-  workerFactory: () => new FakeWorker(),
+  workerFactory: () => new FakeWorker() as unknown as Worker,
 });
 
 /**

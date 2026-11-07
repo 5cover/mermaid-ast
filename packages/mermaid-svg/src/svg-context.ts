@@ -35,7 +35,9 @@ export function createSvgContext(width: number, height: number): SvgContext {
   // Create the SVG canvas
   const canvas = SVG(document.documentElement) as Svg;
   canvas.size(width, height);
-  canvas.attr('xmlns', 'http://www.w3.org/2000/svg');
+  // svg.js writes a no-namespace xmlns attribute that svgdom cannot serialize.
+  // svgdom emits the default namespace declaration itself.
+  canvas.node.removeAttribute('xmlns');
 
   return {
     canvas,
