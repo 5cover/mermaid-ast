@@ -545,7 +545,7 @@ export class C4 extends DiagramWrapper<C4AST> {
         }
         if (query.labelContains) {
           const label = 'label' in element ? element.label : undefined;
-          if (!label || !label.includes(query.labelContains)) {
+          if (!label?.includes(query.labelContains)) {
             matches = false;
           }
         }
@@ -629,8 +629,7 @@ export class C4 extends DiagramWrapper<C4AST> {
       if (query.from && rel.from !== query.from) return false;
       if (query.to && rel.to !== query.to) return false;
       if (query.type && rel.type !== query.type) return false;
-      if (query.labelContains && (!rel.label || !rel.label.includes(query.labelContains)))
-        return false;
+      if (query.labelContains && !rel.label?.includes(query.labelContains)) return false;
       return true;
     });
   }

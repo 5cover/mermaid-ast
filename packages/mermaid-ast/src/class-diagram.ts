@@ -387,7 +387,7 @@ export class ClassDiagram extends DiagramWrapper<ClassDiagramAST> {
       if (query.hasStyle && !cls.cssClasses.includes(query.hasStyle)) continue;
       if (query.inNamespace) {
         const ns = this.ast.namespaces.get(query.inNamespace);
-        if (!ns || !ns.classes.includes(cls.id)) continue;
+        if (!ns?.classes.includes(cls.id)) continue;
       }
       results.push(cls);
     }

@@ -81,8 +81,6 @@ function createMindmapYY(ast: MindmapAST) {
   let lastNode: MindmapNode | null = null;
   // Track if we've seen the first node (which becomes root)
   let isFirstNode = true;
-  // The base indent level (indent of the first/root node)
-  let baseIndent = 0;
 
   return {
     nodeType: NodeType,
@@ -98,7 +96,6 @@ function createMindmapYY(ast: MindmapAST) {
       if (isFirstNode) {
         // First node is always the root, regardless of its indent
         isFirstNode = false;
-        baseIndent = rawIndent;
         logicalLevel = 0;
         indentToLevel.clear();
         indentToLevel.set(rawIndent, 0);

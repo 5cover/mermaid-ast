@@ -411,7 +411,7 @@ export class Requirement extends DiagramWrapper<RequirementAST> {
       if (query.nameContains && !req.name.includes(query.nameContains)) {
         return false;
       }
-      if (query.textContains && (!req.text || !req.text.includes(query.textContains))) {
+      if (query.textContains && !req.text?.includes(query.textContains)) {
         return false;
       }
       return true;

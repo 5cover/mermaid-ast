@@ -423,7 +423,7 @@ export class Flowchart extends DiagramWrapper<FlowchartAST> {
       // Check subgraph
       if (query.inSubgraph) {
         const subgraph = this.ast.subgraphs.find((s) => s.id === query.inSubgraph);
-        if (!subgraph || !subgraph.nodes.includes(id)) {
+        if (!subgraph?.nodes.includes(id)) {
           continue;
         }
       }
