@@ -8,7 +8,7 @@
 import type { ElkExtendedEdge, ElkNode } from 'elkjs';
 // Use elk-api.js with a custom worker factory for Bun compatibility
 import ELK from 'elkjs/lib/elk-api.js';
-import type { FlowchartAST, FlowchartLink, FlowchartNode } from 'mermaid-ast';
+import type { FlowchartAST, FlowchartLink, FlowchartNode } from '@5cover/mermaid-ast';
 import { measureText } from '../svg-context.js';
 import type { LayoutResult, PositionedEdge, PositionedNode, Theme } from '../types.js';
 

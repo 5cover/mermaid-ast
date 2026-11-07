@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { layoutFlowchart } from '../../src/layout/elk-layout.js';
 import { defaultTheme } from '../../src/themes/default.js';
 

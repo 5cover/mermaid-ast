@@ -101,7 +101,7 @@ Four barrel files, each must be updated when adding a diagram type:
 
 ## Version
 
-Current: 0.8.2 (npm: `mermaid-ast`, JSR: `@emily/mermaid-ast`)
+Current: 0.9.0 (npm: `@5cover/mermaid-ast`, JSR: `@emily/mermaid-ast`)
 Vendored parsers: mermaid.js v11.17.2
 
 ## See also

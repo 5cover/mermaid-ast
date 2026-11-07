@@ -1,6 +1,6 @@
 # mermaid-ast
 
-[![npm version](https://img.shields.io/npm/v/mermaid-ast)](https://www.npmjs.com/package/mermaid-ast)
+[![npm version](https://img.shields.io/npm/v/@5cover/mermaid-ast)](https://www.npmjs.com/package/@5cover/mermaid-ast)
 [![JSR](https://jsr.io/badges/@emily/mermaid-ast)](https://jsr.io/@emily/mermaid-ast)
 [![Built with Slate](https://img.shields.io/badge/Built%20with-Slate-blue)](https://randomlabs.ai)
 
@@ -45,13 +45,13 @@ This library provides a way to programmatically work with Mermaid diagrams by pa
 
 ```bash
 # Bun
-bun add mermaid-ast
+bun add @5cover/mermaid-ast
 
 # npm
-npm install mermaid-ast
+npm install @5cover/mermaid-ast
 
 # pnpm
-pnpm add mermaid-ast
+pnpm add @5cover/mermaid-ast
 ```
 
 ## Usage
@@ -59,7 +59,7 @@ pnpm add mermaid-ast
 ### Basic Parsing and Rendering
 
 ```typescript
-import { parse, render } from "mermaid-ast";
+import { parse, render } from "@5cover/mermaid-ast";
 
 // Parse any supported diagram
 const ast = parse(`flowchart LR
@@ -74,7 +74,7 @@ const output = render(ast);
 ### Flowchart Diagrams
 
 ```typescript
-import { parseFlowchart, renderFlowchart } from "mermaid-ast";
+import { parseFlowchart, renderFlowchart } from "@5cover/mermaid-ast";
 
 const ast = parseFlowchart(`flowchart TD
     A[Start] --> B{Is it working?}
@@ -97,7 +97,7 @@ const output = renderFlowchart(ast);
 ### Sequence Diagrams
 
 ```typescript
-import { parseSequence, renderSequence } from "mermaid-ast";
+import { parseSequence, renderSequence } from "@5cover/mermaid-ast";
 
 const ast = parseSequence(`sequenceDiagram
     participant A as Alice
@@ -116,7 +116,7 @@ const output = renderSequence(ast);
 ### Class Diagrams
 
 ```typescript
-import { parseClassDiagram, renderClassDiagram } from "mermaid-ast";
+import { parseClassDiagram, renderClassDiagram } from "@5cover/mermaid-ast";
 
 const ast = parseClassDiagram(`classDiagram
     class Animal {
@@ -143,7 +143,7 @@ const output = renderClassDiagram(ast);
 ### Diagram Type Detection
 
 ```typescript
-import { detectDiagramType } from "mermaid-ast";
+import { detectDiagramType } from "@5cover/mermaid-ast";
 
 detectDiagramType("flowchart LR\n  A --> B"); // "flowchart"
 detectDiagramType("sequenceDiagram\n  A->>B: Hi"); // "sequence"
@@ -158,7 +158,7 @@ The `Flowchart` class provides a unified API for building, mutating, and queryin
 ### Creating Flowcharts
 
 ```typescript
-import { Flowchart } from "mermaid-ast";
+import { Flowchart } from "@5cover/mermaid-ast";
 
 // Create empty flowchart
 const f = Flowchart.create("LR");
@@ -291,7 +291,7 @@ Similar to `Flowchart`, we provide wrapper classes for other diagram types:
 ### ErDiagram
 
 ```typescript
-import { ErDiagram } from "mermaid-ast";
+import { ErDiagram } from "@5cover/mermaid-ast";
 
 const diagram = ErDiagram.create()
   .addEntity("Customer")
@@ -309,7 +309,7 @@ console.log(diagram.render());
 ### Gantt
 
 ```typescript
-import { Gantt } from "mermaid-ast";
+import { Gantt } from "@5cover/mermaid-ast";
 
 const diagram = Gantt.create("Project Timeline")
   .setDateFormat("YYYY-MM-DD")
@@ -325,7 +325,7 @@ console.log(diagram.render());
 ### Mindmap
 
 ```typescript
-import { Mindmap } from "mermaid-ast";
+import { Mindmap } from "@5cover/mermaid-ast";
 
 const diagram = Mindmap.create("Project")
   .addChild("root", "Frontend", { shape: "square" })
@@ -341,7 +341,7 @@ console.log(diagram.render());
 ### Journey
 
 ```typescript
-import { Journey } from "mermaid-ast";
+import { Journey } from "@5cover/mermaid-ast";
 
 const diagram = Journey.create("User Onboarding")
   .addSection("Discovery")
@@ -357,7 +357,7 @@ console.log(diagram.render());
 ### Timeline
 
 ```typescript
-import { Timeline } from "mermaid-ast";
+import { Timeline } from "@5cover/mermaid-ast";
 
 const diagram = Timeline.create("Company History")
   .addSection("2020s")
@@ -373,7 +373,7 @@ console.log(diagram.render());
 ### Sequence
 
 ```typescript
-import { Sequence } from "mermaid-ast";
+import { Sequence } from "@5cover/mermaid-ast";
 
 const diagram = Sequence.create()
   .addActor("alice", "Alice", "participant")
@@ -391,7 +391,7 @@ console.log(diagram.render());
 ### ClassDiagram
 
 ```typescript
-import { ClassDiagram } from "mermaid-ast";
+import { ClassDiagram } from "@5cover/mermaid-ast";
 
 const diagram = ClassDiagram.create()
   .addClass("Animal")
@@ -411,7 +411,7 @@ console.log(diagram.render());
 ### StateDiagram
 
 ```typescript
-import { StateDiagram } from "mermaid-ast";
+import { StateDiagram } from "@5cover/mermaid-ast";
 
 const diagram = StateDiagram.create()
   .addState("Idle", { description: "Waiting for input" })
@@ -436,8 +436,8 @@ console.log(diagram.render());
 All render functions accept an optional `RenderOptions` object to customize output formatting:
 
 ```typescript
-import { renderFlowchart, parseFlowchart } from "mermaid-ast";
-import type { RenderOptions } from "mermaid-ast";
+import { renderFlowchart, parseFlowchart } from "@5cover/mermaid-ast";
+import type { RenderOptions } from "@5cover/mermaid-ast";
 
 const ast = parseFlowchart(`flowchart LR
     A[Start] --> B[Middle] --> C[End]
@@ -508,7 +508,7 @@ flowchart.render({ whitespace: "compact" }); // flowchart TD\n    a[validateInpu
 Sankey diagrams show flow between nodes with weighted links.
 
 ```typescript
-import { Sankey } from "mermaid-ast";
+import { Sankey } from "@5cover/mermaid-ast";
 
 // Create programmatically
 const sankey = Sankey.create()
@@ -535,7 +535,7 @@ console.log(sankey.render());
 Quadrant charts position data points on X-Y axes divided into four quadrants.
 
 ```typescript
-import { Quadrant } from "mermaid-ast";
+import { Quadrant } from "@5cover/mermaid-ast";
 
 // Create programmatically
 const chart = Quadrant.create("Priority Matrix")

@@ -16,19 +16,19 @@ Server-side SVG rendering for Mermaid diagrams. Renders `mermaid-ast` ASTs to SV
 
 ```bash
 # npm
-npm install mermaid-svg mermaid-ast
+npm install mermaid-svg @5cover/mermaid-ast
 
 # bun
-bun add mermaid-svg mermaid-ast
+bun add mermaid-svg @5cover/mermaid-ast
 
 # pnpm
-pnpm add mermaid-svg mermaid-ast
+pnpm add mermaid-svg @5cover/mermaid-ast
 ```
 
 ## Quick Start
 
 ```typescript
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from 'mermaid-svg';
 
 // Parse a Mermaid flowchart
@@ -100,7 +100,7 @@ interface Theme {
 ### Basic Flowchart
 
 ```typescript
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from 'mermaid-svg';
 
 const ast = parseFlowchart(`flowchart TD
@@ -114,7 +114,7 @@ const svg = await renderFlowchartToSVG(ast);
 ### Custom Theme
 
 ```typescript
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from 'mermaid-svg';
 
 const ast = parseFlowchart(`flowchart LR
@@ -136,7 +136,7 @@ const svg = await renderFlowchartToSVG(ast, {
 ### Different Node Shapes
 
 ```typescript
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from 'mermaid-svg';
 
 const ast = parseFlowchart(`flowchart TD
@@ -179,7 +179,7 @@ const btAst = parseFlowchart(`flowchart BT
 ### Save to File
 
 ```typescript
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from 'mermaid-svg';
 import { writeFile } from 'fs/promises';
 

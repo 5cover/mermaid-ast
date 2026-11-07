@@ -7,7 +7,7 @@
  *           deno run --allow-read tests/cross-runtime/test-runtime.ts
  */
 
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from '../../src/index.js';
 
 async function runTests(): Promise<void> {

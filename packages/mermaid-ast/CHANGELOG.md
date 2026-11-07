@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-07
+
 ### Added
 - **Flowchart cross-product packing** - `compactLinks: { cross: true }` writes links that share a connector as `&` statements (`A & B --> C & D`). Edge labels, ids and styles are kept, and linkStyle indices follow the emitted order. Edge order can change. `chains` and `cross` together chain packed groups at shared groups (`A & B --> C --> D & E`) and emit the shortest of the chain-only, cross-only and joint plans, so the output is never longer than `chains` alone.
 - **Identifier compression** - `Flowchart.compress()` and `compressFlowchart()` rename node and subgraph ids to the shortest safe identifiers, keeping labels. Idempotent. Edge ids, class names and classDef names are not renamed.
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Block edge details** - `BlockEdge` gains `startArrowType`, `thickness` and `pattern`. `edgeType` is unchanged.
 
 ### Changed
+- **Package renamed to @5cover/mermaid-ast** - The package is published as `@5cover/mermaid-ast`. Install and import it under that name. The unscoped `mermaid-ast` package on npm is not updated by this release.
 - **compactLinks true is maximum compaction** - `compactLinks: true` now means `{ chains: true, cross: true }`, so it can emit `&` groups and shared-group chains, and it can reorder edges. The output is never longer than `{ chains: true }`. To keep chains only, pass `{ chains: true }`.
 - **Vendored parsers synced to Mermaid 11.17.2** - Grammars for flowchart, sequence, class, state, ER, timeline, quadrant, XYChart, block and C4 changed upstream. Quadrant labels accept non-ASCII text, C4 accepts `ComponentQueue_Ext`, and flowchart accepts `direction TD` inside subgraphs. Unsupported new syntax is rejected with an error: ER subgraphs, class namespace labels and nested namespaces. See the README roadmap for what is still unsupported.
 - **Trailing whitespace in pretty output** - Three inputs that the parser cannot produce now render without a trailing space: a timeline event with empty text, a classDef with no styles, and a mindmap node with an empty id. Valid diagrams are unchanged.

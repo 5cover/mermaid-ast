@@ -4,7 +4,7 @@
  * Combines layout, shapes, edges, and text to produce an SVG string.
  */
 
-import type { FlowchartAST } from 'mermaid-ast';
+import type { FlowchartAST } from '@5cover/mermaid-ast';
 import { renderEdges } from './edges/edge-renderer.js';
 import { createMarkers } from './edges/markers.js';
 import { layoutFlowchart } from './layout/elk-layout.js';

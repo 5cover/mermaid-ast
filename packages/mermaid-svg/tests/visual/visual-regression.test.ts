@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { parseFlowchart } from 'mermaid-ast';
+import { parseFlowchart } from '@5cover/mermaid-ast';
 import { renderFlowchartToSVG } from '../../src/index.js';
 
 const SNAPSHOTS_DIR = join(dirname(import.meta.path), 'snapshots');

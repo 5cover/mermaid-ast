@@ -5,7 +5,7 @@
  *
  * @example
  * ```typescript
- * import { parse, render } from "mermaid-ast";
+ * import { parse, render } from "@5cover/mermaid-ast";
  *
  * const diagram = `
  * flowchart LR
